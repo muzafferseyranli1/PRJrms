@@ -25,7 +25,7 @@ RUN npm run build
 # Runner Stage
 FROM base AS runner
 ENV NODE_ENV=production
-ENV PORT=3005
+ENV PORT=3050
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -46,6 +46,6 @@ RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
-EXPOSE 3005
+EXPOSE 3050
 
 CMD ["npx", "tsx", "server/index.ts"]

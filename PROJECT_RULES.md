@@ -10,10 +10,10 @@
 ---
 
 ## 2. VPS ve Altyapı Yapılandırma Kuralları
-- **Sunucu / VPS:** `188.132.198.144`
+- **Sunucu / VPS:** `188.132.198.144:3050`
 - **Ayrı Proje Prensibi:** 
   - `PRJrms`, VPS üzerinde mevcut RMSv3 projesinin altında veya bir alt modülü olarak **DEĞİL**, tamamen bağımsız bir Docker Compose / Coolify servisi olarak çalışacaktır.
-  - Port çakışmalarını önlemek için bağımsız portlar ve/veya kendine ait alt alan adı (subdomain/reverse proxy) tahsis edilecektir.
+  - Port çakışmalarını önlemek için bağımsız Port 3050 tahsis edilmiştir.
   - Veritabanı olarak bağımsız bir veritabanı şeması/ismi (örn: `prjrms_db` veya bağımsız PostgreSQL container'ı) kullanılacaktır.
 
 ---

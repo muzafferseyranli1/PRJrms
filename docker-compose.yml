@@ -11,11 +11,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public
       - JWT_SECRET=prjrms_super_secret_jwt_key_2026_x1892_production
-      - PORT=3005
-      - NEXT_PUBLIC_APP_URL=http://188.132.198.144:3005
+      - PORT=3050
+      - NEXT_PUBLIC_APP_URL=http://188.132.198.144:3050
       - NODE_ENV=production
     ports:
-      - "3005:3005"
+      - "3050:3050"
     volumes:
       - prjrms_uploads:/app/public/uploads
 
