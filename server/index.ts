@@ -539,19 +539,28 @@ app.prepare().then(() => {
     }
   });
 
-  // 8. Upload File / Media
-  server.post('/api/upload', requireAuth, upload.single('file'), (req: Request, res: Response) => {
+  // 8. Upload File / Media (Tekli veya Çoklu Dosya / Kamera Yükleme)
+  server.post('/api/upload', requireAuth, upload.any(), (req: Request, res: Response) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'Dosya yüklenemedi' });
+      const uploadedFiles = (req.files as Express.Multer.File[]) || (req.file ? [req.file] : []);
+      if (!uploadedFiles || uploadedFiles.length === 0) {
+        return res.status(400).json({ error: 'Yüklenecek dosya bulunamadı' });
       }
 
-      const fileUrl = `/uploads/${req.file.filename}`;
+      const files = uploadedFiles.map((f) => ({
+        fileUrl: `/uploads/${f.filename}`,
+        fileName: f.originalname,
+        fileSize: f.size,
+        mimeType: f.mimetype,
+      }));
+
       return res.json({
-        fileUrl,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype,
+        success: true,
+        files,
+        fileUrl: files[0]?.fileUrl,
+        fileName: files[0]?.fileName,
+        fileSize: files[0]?.fileSize,
+        mimeType: files[0]?.mimeType,
       });
     } catch (err: any) {
       console.error('Upload error:', err);

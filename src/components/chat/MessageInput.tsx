@@ -69,6 +69,9 @@ export default function MessageInput({
       try {
         const formData = new FormData();
         selectedFiles.forEach((file) => formData.append('files', file));
+        if (selectedFiles.length === 1) {
+          formData.append('file', selectedFiles[0]);
+        }
 
         const token = localStorage.getItem('prjrms_token');
         const res = await fetch('/api/upload', {
@@ -79,7 +82,18 @@ export default function MessageInput({
 
         if (res.ok) {
           const data = await res.json();
-          attachments = data.files;
+          if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+            attachments = data.files;
+          } else if (data.fileUrl) {
+            attachments = [
+              {
+                fileUrl: data.fileUrl,
+                fileName: data.fileName,
+                fileSize: data.fileSize,
+                mimeType: data.mimeType,
+              },
+            ];
+          }
         }
       } catch (err) {
         console.error('File upload error:', err);
