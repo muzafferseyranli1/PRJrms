@@ -119,7 +119,7 @@ app.prepare().then(() => {
       });
     } catch (err: any) {
       console.error('Login error:', err);
-      return res.status(500).json({ error: 'Giriş işlemi sırasında sunucu hatası oluştu' });
+      return res.status(500).json({ error: `Giriş işlemi sırasında sunucu hatası oluştu: ${err.message || 'Veritabanı bağlantı hatası'}` });
     }
   });
 

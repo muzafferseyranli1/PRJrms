@@ -23,7 +23,7 @@ async function main() {
     if (status) {
       log('Değişiklikler commit ediliyor...');
       execSync('git add .');
-      execSync('git commit -m "feat: Assign dedicated free port 3050 and public directory fix"');
+      execSync('git commit -m "fix: Prisma binaryTargets and host.docker.internal database connection"');
     }
     log('GitHub reposuna push yapılıyor (main dalı)...');
     execSync('git push origin main');
@@ -32,7 +32,7 @@ async function main() {
     console.warn('Git push uyarısı:', err.message);
   }
 
-  // 2. Patch Application Settings (Port 3050)
+  // 2. Patch Application Settings (Port 3050 & Dockerfile)
   log('2. Coolify uygulama yapılandırması güncelleniyor (Port 3050)...');
   const headers = {
     Authorization: `Bearer ${COOLIFY_API_TOKEN}`,
@@ -57,9 +57,10 @@ async function main() {
   }
 
   // 3. Set Env Variables on Coolify Application
+  // Use host.docker.internal to allow container on VPS to reach host PostgreSQL directly
   log('3. Coolify ortam değişkenleri senkronize ediliyor...');
   const envs = [
-    { key: 'DATABASE_URL', value: 'postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public' },
+    { key: 'DATABASE_URL', value: 'postgresql://postgres:RMSv3_Local_Password_2026!@host.docker.internal:5432/prjrms_db?schema=public' },
     { key: 'JWT_SECRET', value: 'prjrms_super_secret_jwt_key_2026_x1892_production' },
     { key: 'PORT', value: '3050' },
     { key: 'NEXT_PUBLIC_APP_URL', value: 'http://188.132.198.144:3050' },
@@ -82,7 +83,7 @@ async function main() {
       // ignore
     }
   }
-  log('✅ Ortam değişkenleri doğrulandı.');
+  log('✅ Ortam değişkenleri doğrulandı (host.docker.internal).');
 
   // 4. Trigger Deploy
   log('4. Coolify derleme ve container ayağa kaldırma tetikleniyor...');
