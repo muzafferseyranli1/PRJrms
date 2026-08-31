@@ -23,7 +23,7 @@ async function main() {
     if (status) {
       log('Değişiklikler commit ediliyor...');
       execSync('git add .');
-      execSync('git commit -m "feat: Otomatik canlıya alma ve güncellemeler"');
+      execSync('git commit -m "fix: Dockerfile npm install and deployment updates"');
     }
     log('GitHub reposuna push yapılıyor (main dalı)...');
     execSync('git push origin main');
@@ -32,14 +32,32 @@ async function main() {
     console.warn('Git push uyarısı:', err.message);
   }
 
-  // 2. Set Env Variables on Coolify Application
-  log('2. Coolify ortam değişkenleri senkronize ediliyor...');
+  // 2. Patch Application Settings
+  log('2. Coolify uygulama yapılandırması güncelleniyor...');
   const headers = {
     Authorization: `Bearer ${COOLIFY_API_TOKEN}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
   };
 
+  try {
+    await fetch(`${COOLIFY_HOST}/api/v1/applications/${COOLIFY_APP_UUID}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        build_pack: 'dockerfile',
+        dockerfile_location: '/Dockerfile',
+        ports_exposes: '3005',
+        ports_mappings: '3005:3005',
+      }),
+    });
+    log('✅ Uygulama ayarları güncellendi.');
+  } catch (e) {
+    log(`⚠️ Uygulama ayarları uyarısı: ${e.message}`);
+  }
+
+  // 3. Set Env Variables on Coolify Application
+  log('3. Coolify ortam değişkenleri senkronize ediliyor...');
   const envs = [
     { key: 'DATABASE_URL', value: 'postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public' },
     { key: 'JWT_SECRET', value: 'prjrms_super_secret_jwt_key_2026_x1892_production' },
@@ -61,13 +79,13 @@ async function main() {
         }),
       });
     } catch (e) {
-      // ignore if already set
+      // ignore
     }
   }
-  log('✅ Ortam değişkenleri tanımlandı.');
+  log('✅ Ortam değişkenleri doğrulandı.');
 
-  // 3. Trigger Deploy
-  log('3. Coolify derleme ve container ayağa kaldırma tetikleniyor...');
+  // 4. Trigger Deploy
+  log('4. Coolify derleme ve container ayağa kaldırma tetikleniyor...');
   try {
     const deployUrl = `${COOLIFY_HOST}/api/v1/deploy?uuid=${COOLIFY_APP_UUID}&force=true`;
     const res = await fetch(deployUrl, {
@@ -77,7 +95,7 @@ async function main() {
 
     if (res.ok) {
       const data = await res.json();
-      log(`✅ Coolify Deploy Tetiklendi! Deployment UUID: ${data.deployments?.[0]?.deployment_uuid || JSON.stringify(data)}`);
+      log(`✅ Coolify Deploy Başlatıldı! Deployment UUID: ${data.deployments?.[0]?.deployment_uuid || JSON.stringify(data)}`);
     } else {
       const errText = await res.text();
       log(`⚠️ Coolify Deploy Yanıtı (${res.status}): ${errText}`);
