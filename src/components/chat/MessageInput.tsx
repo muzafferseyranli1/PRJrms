@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Smile, X, Image, FileText, CornerDownRight } from 'lucide-react';
-import { MessageItem, AttachmentItem } from '@/lib/types';
+import React, { useState, useRef } from 'react';
+import { Send, Paperclip, Smile, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { MessageItem } from '@/lib/types';
 
 interface Props {
   onSendMessage: (content?: string, attachments?: any[], replyToId?: string) => void;
@@ -12,7 +12,7 @@ interface Props {
   onTypingStop: () => void;
 }
 
-const QUICK_EMOJIS = ['😊', '👍', '❤️', '🔥', '🎉', '🚀', '👀', '💯', '👏', '✅', '🤔', '🙏', '🙌', '🤝'];
+const COMMON_EMOJIS = ['👍', '❤️', '😊', '😂', '🔥', '🎉', '🚀', '✅', '🙏', '👀'];
 
 export default function MessageInput({
   onSendMessage,
@@ -21,25 +21,19 @@ export default function MessageInput({
   onTypingStart,
   onTypingStop,
 }: Props) {
-  const [content, setContent] = useState('');
+  const [text, setText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [attachments, setAttachments] = useState<Array<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }>>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [replyingTo]);
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
-
-    // Typing indicator
+    // Typing throttle
     onTypingStart();
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => {
@@ -54,17 +48,48 @@ export default function MessageInput({
     }
   };
 
-  const handleSend = () => {
-    if (!content.trim() && attachments.length === 0) return;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
 
-    onSendMessage(
-      content.trim() || undefined,
-      attachments.length > 0 ? attachments : undefined,
-      replyingTo?.id
-    );
+  const removeFile = (idx: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
 
-    setContent('');
-    setAttachments([]);
+  const handleSend = async () => {
+    if (!text.trim() && selectedFiles.length === 0) return;
+
+    let attachments: any[] = [];
+
+    if (selectedFiles.length > 0) {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        selectedFiles.forEach((file) => formData.append('files', file));
+
+        const token = localStorage.getItem('prjrms_token');
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          attachments = data.files;
+        }
+      } catch (err) {
+        console.error('File upload error:', err);
+      } finally {
+        setUploading(false);
+      }
+    }
+
+    onSendMessage(text.trim() || undefined, attachments.length > 0 ? attachments : undefined, replyingTo?.id);
+    setText('');
+    setSelectedFiles([]);
     setShowEmojiPicker(false);
     onCancelReply();
     onTypingStop();
@@ -74,89 +99,43 @@ export default function MessageInput({
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const token = localStorage.getItem('prjrms_token');
-    setUploading(true);
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setAttachments((prev) => [...prev, data]);
-        }
-      }
-    } catch (err) {
-      console.error('File upload error:', err);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
   return (
-    <div className="bg-[#202c33] border-t border-[#222e35] p-3 relative select-none">
-      {/* Reply Preview Bar */}
+    <div className="bg-[#f0f2f5] border-t border-[#e9edef] p-2 sm:p-3 select-none relative">
+      {/* Replying Banner */}
       {replyingTo && (
-        <div className="mb-2 p-2.5 rounded-xl bg-[#111b21] border border-[#2a3942] flex items-center justify-between animate-in slide-in-from-bottom-2 duration-150">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-1.5 rounded-lg bg-[#00a884]/20 text-[#00a884]">
-              <CornerDownRight className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold text-[#00a884] truncate">
-                {replyingTo.sender.fullName} kişisine yanıt veriliyor
-              </p>
-              <p className="text-xs text-[#8696a0] truncate">
-                {replyingTo.content || 'Ek / Medya'}
-              </p>
-            </div>
+        <div className="mb-2 p-2 rounded-xl bg-white border-l-4 border-[#008069] flex items-center justify-between shadow-xs animate-in slide-in-from-bottom-2">
+          <div className="min-w-0 flex-1 pr-2">
+            <p className="text-[10px] sm:text-xs font-semibold text-[#008069]">
+              {replyingTo.sender.fullName} kişisine yanıt veriliyor
+            </p>
+            <p className="text-[11px] sm:text-xs text-[#54656f] truncate mt-0.5">
+              {replyingTo.content || 'Ek / Medya'}
+            </p>
           </div>
           <button
             onClick={onCancelReply}
-            className="p-1 rounded-lg text-[#8696a0] hover:text-white hover:bg-[#202c33] transition"
+            className="p-1 rounded-full text-[#54656f] hover:text-[#111b21] hover:bg-[#f0f2f5] transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Attachment Previews */}
-      {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {attachments.map((att, idx) => (
+      {/* Selected Attachments Preview */}
+      {selectedFiles.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2">
+          {selectedFiles.map((file, idx) => (
             <div
               key={idx}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#111b21] border border-[#2a3942] text-xs text-[#e9edef]"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-[#e9edef] text-xs text-[#111b21] flex-shrink-0 shadow-xs"
             >
-              {att.mimeType.startsWith('image/') ? (
-                <Image className="w-3.5 h-3.5 text-[#00a884]" />
+              {file.type.startsWith('image/') ? (
+                <ImageIcon className="w-3.5 h-3.5 text-[#008069]" />
               ) : (
-                <FileText className="w-3.5 h-3.5 text-[#00a884]" />
+                <FileText className="w-3.5 h-3.5 text-[#008069]" />
               )}
-              <span className="max-w-[150px] truncate">{att.fileName}</span>
-              <button
-                onClick={() => removeAttachment(idx)}
-                className="p-0.5 rounded text-[#8696a0] hover:text-red-400"
-              >
+              <span className="truncate max-w-[100px] text-[11px]">{file.name}</span>
+              <button onClick={() => removeFile(idx)} className="text-[#54656f] hover:text-red-600">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -164,76 +143,57 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* Emoji Picker Popover */}
+      {/* Emoji Palette Popover */}
       {showEmojiPicker && (
-        <div className="absolute bottom-16 left-4 z-40 bg-[#111b21] border border-[#2a3942] rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-          <div className="grid grid-cols-7 gap-1.5">
-            {QUICK_EMOJIS.map((em) => (
-              <button
-                key={em}
-                type="button"
-                onClick={() => {
-                  setContent((prev) => prev + em);
-                  if (textareaRef.current) textareaRef.current.focus();
-                }}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-xl hover:bg-[#202c33] hover:scale-125 transition"
-              >
-                {em}
-              </button>
-            ))}
-          </div>
+        <div className="absolute bottom-16 left-3 bg-white border border-[#e9edef] rounded-2xl p-2 shadow-xl flex items-center gap-1 z-20 animate-in fade-in zoom-in-95">
+          {COMMON_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => setText((prev) => prev + emoji)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-[#f0f2f5] active:scale-125 transition"
+            >
+              {emoji}
+            </button>
+          ))}
         </div>
       )}
 
       {/* Input Row */}
-      <div className="flex items-end gap-2">
-        {/* Emoji Button */}
+      <div className="flex items-end gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className={`p-2.5 rounded-xl transition ${
-            showEmojiPicker
-              ? 'text-[#00a884] bg-[#111b21]'
-              : 'text-[#8696a0] hover:text-white hover:bg-[#111b21]'
-          }`}
-          title="Emoji Ekle"
+          className="p-2 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-white transition flex-shrink-0"
         >
           <Smile className="w-5 h-5" />
         </button>
 
-        {/* Attachment Upload Button */}
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="p-2.5 rounded-xl text-[#8696a0] hover:text-white hover:bg-[#111b21] transition disabled:opacity-50"
-          title="Dosya veya Resim Ekle"
-        >
-          {uploading ? (
-            <div className="w-5 h-5 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Paperclip className="w-5 h-5" />
-          )}
-        </button>
-
         <input
-          ref={fileInputRef}
           type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
           multiple
-          onChange={handleFileUpload}
           className="hidden"
         />
 
-        {/* Text Input Area */}
-        <div className="flex-1 bg-[#2a3942] rounded-2xl border border-transparent focus-within:border-[#00a884]/40 px-3.5 py-2 transition">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-white transition flex-shrink-0"
+        >
+          <Paperclip className="w-5 h-5" />
+        </button>
+
+        {/* Text Area */}
+        <div className="flex-1 bg-white rounded-2xl border border-[#e9edef] focus-within:border-[#008069] px-3 py-1.5 transition flex items-center shadow-xs min-w-0">
           <textarea
             ref={textareaRef}
             rows={1}
-            value={content}
-            onChange={handleInputChange}
+            value={text}
+            onChange={handleTextChange}
             onKeyDown={handleKeyDown}
             placeholder="Bir mesaj yazın..."
-            className="w-full bg-transparent text-sm text-[#e9edef] placeholder-[#8696a0]/70 focus:outline-none resize-none max-h-32 leading-relaxed"
+            className="w-full bg-transparent text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none resize-none max-h-28 leading-relaxed"
           />
         </div>
 
@@ -241,11 +201,10 @@ export default function MessageInput({
         <button
           type="button"
           onClick={handleSend}
-          disabled={!content.trim() && attachments.length === 0}
-          className="p-2.5 rounded-2xl bg-[#00a884] hover:bg-[#008f6f] text-[#111b21] transition shadow-lg shadow-[#00a884]/20 disabled:opacity-40 disabled:hover:bg-[#00a884] flex-shrink-0"
-          title="Gönder (Enter)"
+          disabled={uploading || (!text.trim() && selectedFiles.length === 0)}
+          className="p-2.5 rounded-full bg-[#008069] hover:bg-[#00705a] text-white transition shadow-md shadow-[#008069]/25 flex-shrink-0 disabled:opacity-40 disabled:hover:bg-[#008069]"
         >
-          <Send className="w-5 h-5" />
+          <Send className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
     </div>

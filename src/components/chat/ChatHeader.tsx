@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, CheckSquare, ArrowLeft, MoreVertical, Trash2, AlertTriangle } from 'lucide-react';
+import { CheckSquare, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
 import { GroupItem, UserSession } from '@/lib/types';
 
 interface Props {
@@ -29,13 +29,13 @@ export default function ChatHeader({
 
   return (
     <>
-      <header className="h-16 px-3 sm:px-4 flex items-center justify-between bg-[#202c33] border-b border-[#222e35] select-none z-10">
+      <header className="h-14 sm:h-16 px-2 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef] select-none z-10">
         {/* Group Info & Mobile Back Button */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
           {onBackToSidebar && (
             <button
               onClick={onBackToSidebar}
-              className="md:hidden p-2 -ml-1 rounded-xl text-[#8696a0] hover:text-white hover:bg-[#111b21] transition"
+              className="md:hidden p-1.5 -ml-1 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-[#e9edef] transition flex-shrink-0"
               title="Sohbet Listesine Dön"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -45,13 +45,13 @@ export default function ChatHeader({
           <img
             src={group.avatarUrl || 'https://api.dicebear.com/7.x/identicon/svg?seed=' + group.id}
             alt={group.name}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#2a3942] bg-[#111b21] object-cover flex-shrink-0"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-[#e9edef] bg-white object-cover flex-shrink-0"
           />
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-[#e9edef] truncate">{group.name}</h2>
-            <div className="text-[11px] sm:text-xs text-[#8696a0] truncate">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xs sm:text-sm font-semibold text-[#111b21] truncate">{group.name}</h2>
+            <div className="text-[10px] sm:text-xs text-[#54656f] truncate">
               {typingUsers.length > 0 ? (
-                <span className="text-[#00a884] font-medium animate-pulse">
+                <span className="text-[#008069] font-medium animate-pulse">
                   {typingUsers.join(', ')} yazıyor...
                 </span>
               ) : (
@@ -62,22 +62,22 @@ export default function ChatHeader({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           {/* Toggle Task Side Panel Button */}
           <button
             onClick={onToggleTaskPanel}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
               isTaskPanelOpen
-                ? 'bg-[#00a884] text-[#111b21] shadow-lg shadow-[#00a884]/20'
-                : 'bg-[#111b21] text-[#e9edef] border border-[#2a3942] hover:border-[#00a884]/50'
+                ? 'bg-[#008069] text-white shadow-md shadow-[#008069]/20'
+                : 'bg-white text-[#111b21] border border-[#e9edef] hover:border-[#008069]/50 shadow-xs'
             }`}
           >
-            <CheckSquare className="w-4 h-4" />
-            <span className="hidden sm:inline">Görevler</span>
+            <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline sm:inline">Görevler</span>
             {taskCount > 0 && (
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  isTaskPanelOpen ? 'bg-[#111b21] text-[#00a884]' : 'bg-[#00a884] text-[#111b21]'
+                className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
+                  isTaskPanelOpen ? 'bg-white text-[#008069]' : 'bg-[#008069] text-white'
                 }`}
               >
                 {taskCount}
@@ -90,9 +90,9 @@ export default function ChatHeader({
             <button
               onClick={() => setShowConfirmDelete(true)}
               title="Grubu Sil (Yönetici)"
-              className="p-2 rounded-xl text-[#8696a0] hover:text-red-400 hover:bg-[#111b21] transition"
+              className="p-1.5 sm:p-2 rounded-xl text-[#54656f] hover:text-red-600 hover:bg-white transition"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           )}
         </div>
@@ -100,15 +100,15 @@ export default function ChatHeader({
 
       {/* Delete Group Confirmation Modal */}
       {showConfirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="bg-[#111b21] border border-red-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 mx-auto flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-red-200 rounded-3xl w-full max-w-sm p-5 sm:p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Grubu Silmek İstiyor Musunuz?</h3>
-              <p className="text-xs text-[#8696a0] mt-1.5">
-                <span className="text-white font-medium">"{group.name}"</span> grubu ve içindeki tüm mesajlar, ekler ve görevler kalıcı olarak silinecektir.
+              <h3 className="text-base font-semibold text-[#111b21]">Grubu Silmek İstiyor Musunuz?</h3>
+              <p className="text-xs text-[#54656f] mt-1.5">
+                <span className="text-[#111b21] font-semibold">"{group.name}"</span> grubu ve içindeki tüm mesajlar, ekler ve görevler kalıcı olarak silinecektir.
               </p>
             </div>
 
@@ -116,7 +116,7 @@ export default function ChatHeader({
               <button
                 type="button"
                 onClick={() => setShowConfirmDelete(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-[#8696a0] hover:bg-[#202c33] hover:text-white transition"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-[#54656f] hover:bg-[#f0f2f5] transition"
               >
                 Vazgeç
               </button>
@@ -126,7 +126,7 @@ export default function ChatHeader({
                   setShowConfirmDelete(false);
                   onDeleteGroup(group.id);
                 }}
-                className="px-5 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition shadow-lg shadow-red-600/20"
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition shadow-md shadow-red-600/20"
               >
                 Evet, Grubu Sil
               </button>

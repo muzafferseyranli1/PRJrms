@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, CheckSquare, Calendar, User, AlertCircle, Clock, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CheckSquare, Calendar, User, AlertCircle, Clock } from 'lucide-react';
 import { MessageItem, GroupMemberItem, TaskPriority } from '@/lib/types';
 import { getSocket } from '@/lib/socket';
 
@@ -22,24 +22,17 @@ export default function CreateTaskModal({
 }: Props) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assignedToId, setAssignedToId] = useState('');
+  const [assignedToId, setAssignedToId] = useState(members[0]?.userId || '');
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
   const [dueDate, setDueDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (message) {
-      setTitle(message.content || 'Mesajdan türetilen görev');
-      setDescription(`Orijinal Mesaj: "${message.content || 'Ek / Medya'}"`);
-      if (members.length > 0) {
-        setAssignedToId(members[0].userId);
-      }
-      // Default due date: tomorrow at 18:00
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(18, 0, 0, 0);
-      setDueDate(tomorrow.toISOString().slice(0, 16));
+      setTitle(message.content ? message.content.slice(0, 80) : 'Görev');
+      setDescription(message.content || '');
+      setAssignedToId(members[0]?.userId || '');
     }
   }, [message, members]);
 
@@ -57,10 +50,10 @@ export default function CreateTaskModal({
 
     const socket = getSocket();
     socket.emit('create_task', {
-      groupId,
       messageId: message.id,
+      groupId,
       title: title.trim(),
-      description: description.trim(),
+      description: description.trim() || undefined,
       assignedToId,
       priority,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
@@ -71,82 +64,64 @@ export default function CreateTaskModal({
   };
 
   const priorityOptions: Array<{ id: TaskPriority; label: string; color: string }> = [
-    { id: 'LOW', label: 'Düşük', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    { id: 'MEDIUM', label: 'Normal', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-    { id: 'HIGH', label: 'Yüksek', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-    { id: 'URGENT', label: 'Acil / Kritik', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { id: 'LOW', label: 'Düşük', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    { id: 'MEDIUM', label: 'Normal', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+    { id: 'HIGH', label: 'Yüksek', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+    { id: 'URGENT', label: 'Acil', color: 'bg-red-50 text-red-700 border-red-200' },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-[#111b21] border border-[#222e35] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#222e35] bg-[#202c33]/50">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[#00a884]/20 text-[#00a884]">
-              <CheckSquare className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-white border border-[#e9edef] rounded-3xl w-full max-w-[94vw] sm:max-w-md overflow-hidden shadow-2xl my-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#e9edef] bg-[#f0f2f5]">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-[#008069]/10 text-[#008069]">
+              <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                Mesajdan Görev Oluştur
-                <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-[#00a884]/20 text-[#00a884]">
-                  Chat-to-Task
-                </span>
-              </h2>
-              <p className="text-xs text-[#8696a0]">Mesajı ekip görevine dönüştür ve kişiye ata</p>
+              <h2 className="text-sm sm:text-base font-semibold text-[#111b21]">Mesajı Göreve Dönüştür</h2>
+              <p className="text-[10px] sm:text-xs text-[#54656f]">Chat-to-Task Görev Kartı</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#8696a0] hover:text-white hover:bg-[#202c33] transition"
+            className="p-1.5 rounded-lg text-[#54656f] hover:text-[#111b21] hover:bg-white transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 sm:space-y-4">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {error}
+            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Original Message Card Reference */}
-          <div className="p-3 rounded-xl bg-[#202c33]/60 border border-[#2a3942] flex items-start gap-2.5">
-            <img
-              src={message.sender.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + message.sender.id}
-              alt={message.sender.fullName}
-              className="w-7 h-7 rounded-full bg-[#111b21] mt-0.5"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-[#00a884]">{message.sender.fullName}</p>
-              <p className="text-xs text-[#e9edef] line-clamp-2 mt-0.5">{message.content || 'Medya / Dosya eki'}</p>
-            </div>
-          </div>
-
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Görev Başlığı</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">Görev Başlığı <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              placeholder="Görev başlığını girin..."
-              className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-2 text-sm text-[#e9edef] placeholder-[#8696a0]/50 focus:outline-none focus:border-[#00a884]"
+              placeholder="Görev için kısa bir başlık..."
+              className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#111b21] focus:outline-none transition"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Assignee */}
             <div>
-              <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Atanan Kişi</label>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">Sorumlu Kişi <span className="text-red-500">*</span></label>
               <div className="relative">
                 <select
                   value={assignedToId}
                   onChange={(e) => setAssignedToId(e.target.value)}
-                  className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-2 text-xs text-[#e9edef] focus:outline-none focus:border-[#00a884] appearance-none"
+                  className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-2 text-xs text-[#111b21] focus:outline-none transition appearance-none"
                 >
                   {members.map((m) => (
                     <option key={m.userId} value={m.userId}>
@@ -160,31 +135,29 @@ export default function CreateTaskModal({
 
             {/* Due Date */}
             <div>
-              <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Bitiş Tarihi ve Saati</label>
-              <div className="relative">
-                <input
-                  type="datetime-local"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-1.5 text-xs text-[#e9edef] focus:outline-none focus:border-[#00a884]"
-                />
-              </div>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">Bitiş Tarihi & Saati</label>
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-1.5 text-xs text-[#111b21] focus:outline-none transition"
+              />
             </div>
           </div>
 
           {/* Priority */}
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Öncelik Derecesi</label>
-            <div className="grid grid-cols-4 gap-2">
+            <label className="block text-xs font-medium text-[#54656f] mb-1">Öncelik Seviyesi</label>
+            <div className="grid grid-cols-4 gap-1.5">
               {priorityOptions.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setPriority(opt.id)}
-                  className={`py-2 px-2 rounded-xl text-xs font-medium border transition text-center ${
+                  className={`py-1.5 px-1 rounded-xl text-[10px] sm:text-xs font-semibold border transition text-center ${
                     priority === opt.id
-                      ? `${opt.color} border-current ring-1 ring-current`
-                      : 'bg-[#202c33] border-[#2a3942] text-[#8696a0] hover:text-white'
+                      ? `${opt.color} border-current ring-2 ring-[#008069]/30`
+                      : 'bg-[#f0f2f5] border-transparent text-[#54656f] hover:bg-gray-200'
                   }`}
                 >
                   {opt.label}
@@ -195,32 +168,31 @@ export default function CreateTaskModal({
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Açıklama / Notlar (Opsiyonel)</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">Detaylar / Açıklama</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="Ek açıklamalar..."
-              className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-2 text-xs text-[#e9edef] placeholder-[#8696a0]/50 focus:outline-none focus:border-[#00a884] resize-none"
+              className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-2 text-xs text-[#111b21] focus:outline-none transition resize-none"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 flex items-center justify-end gap-2.5">
+          <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-[#8696a0] hover:bg-[#202c33] hover:text-white transition"
+              className="px-3.5 py-2 rounded-xl text-xs font-medium text-[#54656f] hover:bg-[#f0f2f5] transition"
             >
               Vazgeç
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#00a884] hover:bg-[#008f6f] text-[#111b21] transition shadow-lg shadow-[#00a884]/20 flex items-center gap-1.5 disabled:opacity-50"
+              disabled={loading || !title.trim()}
+              className="px-4 sm:px-5 py-2 rounded-xl text-xs font-semibold bg-[#008069] hover:bg-[#00705a] text-white transition shadow-md shadow-[#008069]/20 flex items-center gap-1.5 disabled:opacity-50"
             >
               <CheckSquare className="w-4 h-4" />
-              <span>Görevi Oluştur ve Ata</span>
+              <span>{loading ? 'Oluşturuluyor...' : 'Görevi Başlat'}</span>
             </button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Plus, UserPlus, Settings, LogOut, MessageSquare, Shield, Users } from 'lucide-react';
+import { Search, Plus, UserPlus, Settings, LogOut, Shield, Users } from 'lucide-react';
 import { GroupItem, UserSession } from '@/lib/types';
 import AdminCreateUserModal from './AdminCreateUserModal';
 import UserProfileModal from './UserProfileModal';
@@ -38,91 +38,91 @@ export default function Sidebar({
   );
 
   return (
-    <aside className={`w-full md:w-80 lg:w-96 h-full flex flex-col bg-[#111b21] border-r border-[#222e35] select-none ${className}`}>
+    <aside className={`w-full md:w-80 lg:w-96 h-full flex flex-col bg-white border-r border-[#e9edef] select-none ${className}`}>
       {/* Top Header */}
-      <div className="h-16 px-4 flex items-center justify-between bg-[#202c33] border-b border-[#222e35]">
-        <div className="flex items-center gap-3">
-          <div className="relative cursor-pointer" onClick={() => setShowProfileModal(true)}>
+      <div className="h-16 px-3 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative cursor-pointer flex-shrink-0" onClick={() => setShowProfileModal(true)}>
             <img
               src={currentUser.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'}
               alt={currentUser.fullName}
-              className="w-10 h-10 rounded-full border border-[#00a884] bg-[#111b21] object-cover"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-[#008069] bg-white object-cover"
             />
-            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#00a884] border-2 border-[#202c33]" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#008069] border-2 border-white" />
           </div>
-          <div className="overflow-hidden">
-            <h3 className="text-sm font-semibold text-[#e9edef] truncate">{currentUser.fullName}</h3>
+          <div className="overflow-hidden min-w-0">
+            <h3 className="text-xs sm:text-sm font-semibold text-[#111b21] truncate">{currentUser.fullName}</h3>
             <div className="flex items-center gap-1">
               {currentUser.role === 'ADMIN' ? (
-                <span className="text-[10px] font-semibold text-purple-400 flex items-center gap-0.5">
+                <span className="text-[9px] sm:text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.2 rounded flex items-center gap-0.5">
                   <Shield className="w-2.5 h-2.5" /> Yönetici
                 </span>
               ) : (
-                <span className="text-[10px] text-[#8696a0]">Ekip Üyesi</span>
+                <span className="text-[9px] sm:text-[10px] text-[#54656f]">Ekip Üyesi</span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* 🌟 Yeni Grup Oluştur Butonu 🌟 */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+          {/* Yeni Grup Butonu */}
           <button
             onClick={() => setShowCreateGroupModal(true)}
             title="Yeni Sohbet Grubu Oluştur"
-            className="p-2 rounded-xl text-[#8696a0] hover:text-[#00a884] hover:bg-[#111b21] transition"
+            className="p-1.5 sm:p-2 rounded-xl text-[#54656f] hover:text-[#008069] hover:bg-white transition"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           {currentUser.role === 'ADMIN' && (
             <button
               onClick={() => setShowAdminModal(true)}
               title="Yeni Ekip Üyesi Ekle"
-              className="p-2 rounded-xl text-[#8696a0] hover:text-[#00a884] hover:bg-[#111b21] transition"
+              className="p-1.5 sm:p-2 rounded-xl text-[#54656f] hover:text-[#008069] hover:bg-white transition"
             >
-              <UserPlus className="w-5 h-5" />
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           )}
           <button
             onClick={() => setShowProfileModal(true)}
             title="Profili Düzenle"
-            className="p-2 rounded-xl text-[#8696a0] hover:text-white hover:bg-[#111b21] transition"
+            className="p-1.5 sm:p-2 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-white transition"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <button
             onClick={onLogout}
             title="Çıkış Yap"
-            className="p-2 rounded-xl text-[#8696a0] hover:text-red-400 hover:bg-[#111b21] transition"
+            className="p-1.5 sm:p-2 rounded-xl text-[#54656f] hover:text-red-600 hover:bg-white transition"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* Search Bar */}
-      <div className="p-3 bg-[#111b21] border-b border-[#222e35]">
+      <div className="p-2.5 sm:p-3 bg-white border-b border-[#e9edef]">
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Sohbet veya grup ara..."
-            className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2 text-xs text-[#e9edef] placeholder-[#8696a0]/60 focus:outline-none focus:border-[#00a884]"
+            className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl pl-9 pr-3 py-1.5 text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none transition"
           />
         </div>
       </div>
 
-      {/* Groups / Channels List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#222e35]/40">
-        <div className="px-4 py-2 text-[11px] font-semibold tracking-wider uppercase text-[#8696a0] flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5 text-[#00a884]" /> Sohbet Grupları ({filteredGroups.length})
+      {/* Groups List */}
+      <div className="flex-1 overflow-y-auto divide-y divide-[#e9edef]">
+        <div className="px-3 sm:px-4 py-2 text-[10px] sm:text-[11px] font-semibold tracking-wider uppercase text-[#54656f] flex items-center justify-between bg-[#f0f2f5]/40">
+          <span className="flex items-center gap-1">
+            <Users className="w-3.5 h-3.5 text-[#008069]" /> Gruplar ({filteredGroups.length})
           </span>
           <button
             onClick={() => setShowCreateGroupModal(true)}
-            className="text-[10px] text-[#00a884] hover:underline font-semibold flex items-center gap-0.5"
+            className="text-[10px] text-[#008069] hover:underline font-semibold flex items-center gap-0.5"
           >
             <Plus className="w-3 h-3" /> Yeni Grup
           </button>
@@ -141,36 +141,36 @@ export default function Sidebar({
               <div
                 key={group.id}
                 onClick={() => onSelectGroup(group.id)}
-                className={`flex items-center gap-3.5 px-4 py-3.5 cursor-pointer transition ${
+                className={`flex items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer transition ${
                   isActive
-                    ? 'bg-[#2a3942] border-l-4 border-[#00a884]'
-                    : 'hover:bg-[#202c33]/70'
+                    ? 'bg-[#f0f2f5] border-l-4 border-[#008069]'
+                    : 'hover:bg-[#f5f6f6] active:bg-[#e9edef]'
                 }`}
               >
                 <div className="relative flex-shrink-0">
                   <img
                     src={group.avatarUrl || 'https://api.dicebear.com/7.x/identicon/svg?seed=' + group.id}
                     alt={group.name}
-                    className="w-12 h-12 rounded-full border border-[#2a3942] bg-[#202c33] object-cover"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-[#e9edef] bg-[#f0f2f5] object-cover"
                   />
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#00a884] border-2 border-[#111b21] flex items-center justify-center text-[8px] text-white">
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#008069] border-2 border-white flex items-center justify-center text-[8px] font-bold text-white">
                     {group.members.length}
                   </span>
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium text-[#e9edef] truncate">{group.name}</h4>
+                    <h4 className="text-xs sm:text-sm font-semibold text-[#111b21] truncate">{group.name}</h4>
                     {lastMsg && (
                       <span className="text-[10px] text-[#8696a0]">
                         {new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#8696a0] truncate mt-0.5">
+                  <p className="text-[11px] sm:text-xs text-[#54656f] truncate mt-0.5">
                     {lastMsg ? (
                       <>
-                        <span className="text-[#00a884] font-medium">{lastMsg.sender.fullName}: </span>
+                        <span className="text-[#008069] font-medium">{lastMsg.sender.fullName}: </span>
                         {lastMsg.content || (lastMsg.attachments?.length ? '📎 Medya / Ek' : '')}
                       </>
                     ) : (
@@ -189,7 +189,7 @@ export default function Sidebar({
         isOpen={showCreateGroupModal}
         onClose={() => setShowCreateGroupModal(false)}
         onGroupCreated={(newGroupId) => {
-          onUserCreated(); // refresh groups
+          onUserCreated();
           onSelectGroup(newGroupId);
         }}
         currentUser={currentUser}

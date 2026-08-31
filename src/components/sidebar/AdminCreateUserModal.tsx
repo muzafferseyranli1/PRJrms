@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, UserPlus, Shield, Mail, Lock, User } from 'lucide-react';
+import { X, UserPlus, Shield, User, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UserRole } from '@/lib/types';
 
 interface Props {
   isOpen: boolean;
@@ -11,28 +12,46 @@ interface Props {
 
 export default function AdminCreateUserModal({ isOpen, onClose, onUserCreated }: Props) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('123456');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
+  const [password, setPassword] = useState('123456');
+  const [role, setRole] = useState<UserRole>('MEMBER');
+  const [avatarSeed, setAvatarSeed] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!email || !fullName) {
+      setError('Lütfen e-posta ve isim alanlarını doldurun.');
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+    setSuccess(false);
 
     try {
       const token = localStorage.getItem('prjrms_token');
-      const res = await fetch('/api/auth/create-user', {
+      const avatarUrl = avatarSeed
+        ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`
+        : undefined;
+
+      const res = await fetch('/api/auth/register-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ email, password, fullName, role }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          fullName: fullName.trim(),
+          password: password || '123456',
+          role,
+          avatarUrl,
+        }),
       });
 
       const data = await res.json();
@@ -40,11 +59,14 @@ export default function AdminCreateUserModal({ isOpen, onClose, onUserCreated }:
         throw new Error(data.error || 'Kullanıcı oluşturulamadı');
       }
 
+      setSuccess(true);
       onUserCreated();
-      onClose();
-      setEmail('');
-      setFullName('');
-      setPassword('123456');
+      setTimeout(() => {
+        onClose();
+        setSuccess(false);
+        setEmail('');
+        setFullName('');
+      }, 1000);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -53,123 +75,119 @@ export default function AdminCreateUserModal({ isOpen, onClose, onUserCreated }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-[#111b21] border border-[#222e35] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-white border border-[#e9edef] rounded-3xl w-full max-w-[94vw] sm:max-w-md overflow-hidden shadow-2xl my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#222e35] bg-[#202c33]/50">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[#00a884]/20 text-[#00a884]">
-              <UserPlus className="w-5 h-5" />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#e9edef] bg-[#f0f2f5]">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-[#008069]/10 text-[#008069]">
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white">Yeni Ekip Üyesi Ekle</h2>
-              <p className="text-xs text-[#8696a0]">Sisteme yeni kullanıcı davet et / tanımla</p>
+              <h2 className="text-sm sm:text-base font-semibold text-[#111b21]">Yeni Ekip Üyesi Ekle</h2>
+              <p className="text-[10px] sm:text-xs text-[#54656f]">Yönetici Özel İşlemi</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#8696a0] hover:text-white hover:bg-[#202c33] transition"
+            className="p-1.5 rounded-lg text-[#54656f] hover:text-[#111b21] hover:bg-white transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3.5 sm:space-y-4">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-              {error}
+            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {success && (
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-[#008069]" />
+              <span>Kullanıcı başarıyla oluşturuldu!</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Ad Soyad</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">Ad Soyad <span className="text-red-500">*</span></label>
             <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Örn: Caner Korkmaz"
+                placeholder="Örn: Caner Erkin"
                 required
-                className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2 text-sm text-[#e9edef] placeholder-[#8696a0]/50 focus:outline-none focus:border-[#00a884]"
+                className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-[#111b21] focus:outline-none transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">E-Posta Adresi</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">E-Posta Adresi <span className="text-red-500">*</span></label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="caner@prjrms.local"
                 required
-                className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2 text-sm text-[#e9edef] placeholder-[#8696a0]/50 focus:outline-none focus:border-[#00a884]"
+                className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-[#111b21] focus:outline-none transition"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Başlangıç Şifresi</label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="123456"
-                required
-                className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2 text-sm text-[#e9edef] placeholder-[#8696a0]/50 focus:outline-none focus:border-[#00a884]"
-              />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">Geçici Şifre</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+                <input
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="123456"
+                  className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl pl-9 pr-3 py-2 text-xs text-[#111b21] focus:outline-none transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">Rol</label>
+              <div className="relative">
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-2 text-xs text-[#111b21] focus:outline-none transition"
+                >
+                  <option value="MEMBER">Ekip Üyesi</option>
+                  <option value="ADMIN">Yönetici</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Yetki Rolü</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRole('MEMBER')}
-                className={`py-2 px-3 rounded-xl border text-xs font-medium transition flex items-center justify-center gap-1.5 ${
-                  role === 'MEMBER'
-                    ? 'bg-[#00a884]/20 border-[#00a884] text-[#00a884]'
-                    : 'bg-[#202c33] border-[#2a3942] text-[#8696a0] hover:text-white'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" /> Ekip Üyesi
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole('ADMIN')}
-                className={`py-2 px-3 rounded-xl border text-xs font-medium transition flex items-center justify-center gap-1.5 ${
-                  role === 'ADMIN'
-                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
-                    : 'bg-[#202c33] border-[#2a3942] text-[#8696a0] hover:text-white'
-                }`}
-              >
-                <Shield className="w-3.5 h-3.5" /> Yönetici (Admin)
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-4 flex items-center justify-end gap-2.5">
+          {/* Footer Actions */}
+          <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-[#8696a0] hover:bg-[#202c33] hover:text-white transition"
+              className="px-3.5 py-2 rounded-xl text-xs font-medium text-[#54656f] hover:bg-[#f0f2f5] transition"
             >
-              İptal
+              Vazgeç
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#00a884] hover:bg-[#008f6f] text-[#111b21] transition shadow-lg shadow-[#00a884]/20 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 sm:px-5 py-2 rounded-xl text-xs font-semibold bg-[#008069] hover:bg-[#00705a] text-white transition shadow-md shadow-[#008069]/20 flex items-center gap-1.5 disabled:opacity-50"
             >
-              {loading ? 'Oluşturuluyor...' : 'Kullanıcıyı Kaydet'}
+              <UserPlus className="w-4 h-4" />
+              <span>{loading ? 'Ekleniyor...' : 'Üyeyi Kaydet'}</span>
             </button>
           </div>
         </form>

@@ -57,18 +57,18 @@ export default function ContextMenu({
     onClose();
   };
 
-  // On mobile: render as Bottom Sheet
+  // Mobile Bottom Sheet
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs p-0 animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-xs p-0 animate-in fade-in duration-150">
         <div
           ref={menuRef}
-          className="w-full bg-[#111b21] border-t border-[#222e35] rounded-t-3xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-200"
+          className="w-full bg-white border-t border-[#e9edef] rounded-t-3xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-200"
         >
-          <div className="w-10 h-1 rounded-full bg-[#2a3942] mx-auto mb-3" />
+          <div className="w-10 h-1 rounded-full bg-gray-300 mx-auto mb-3" />
 
           {/* Quick Emoji Bar */}
-          <div className="flex items-center justify-around py-2.5 px-2 bg-[#202c33] rounded-2xl mb-3">
+          <div className="flex items-center justify-around py-2.5 px-2 bg-[#f0f2f5] rounded-2xl mb-3">
             {EMOJIS.map((emoji) => (
               <button
                 key={emoji}
@@ -84,15 +84,15 @@ export default function ContextMenu({
           </div>
 
           {/* Actions List */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <button
               onClick={() => {
                 onConvertToTask(message);
                 onClose();
               }}
-              className="w-full px-4 py-3.5 flex items-center gap-3.5 rounded-xl text-sm font-semibold text-emerald-400 bg-[#00a884]/15 active:bg-[#00a884]/25 transition"
+              className="w-full px-4 py-3 flex items-center gap-3.5 rounded-2xl text-sm font-semibold text-emerald-800 bg-emerald-50 active:bg-emerald-100 transition"
             >
-              <CheckSquare className="w-5 h-5 text-[#00a884]" />
+              <CheckSquare className="w-5 h-5 text-[#008069]" />
               <span>Göreve Dönüştür</span>
             </button>
 
@@ -101,39 +101,39 @@ export default function ContextMenu({
                 onReply(message);
                 onClose();
               }}
-              className="w-full px-4 py-3.5 flex items-center gap-3.5 rounded-xl text-sm text-[#e9edef] bg-[#202c33] active:bg-[#2a3942] transition"
+              className="w-full px-4 py-3 flex items-center gap-3.5 rounded-2xl text-sm font-medium text-[#111b21] bg-[#f0f2f5] active:bg-[#e9edef] transition"
             >
-              <Reply className="w-5 h-5 text-[#8696a0]" />
+              <Reply className="w-5 h-5 text-[#54656f]" />
               <span>Yanıtla (Alıntıla)</span>
             </button>
 
             {message.content && (
               <button
                 onClick={handleCopy}
-                className="w-full px-4 py-3.5 flex items-center gap-3.5 rounded-xl text-sm text-[#e9edef] bg-[#202c33] active:bg-[#2a3942] transition"
+                className="w-full px-4 py-3 flex items-center gap-3.5 rounded-2xl text-sm font-medium text-[#111b21] bg-[#f0f2f5] active:bg-[#e9edef] transition"
               >
-                <Copy className="w-5 h-5 text-[#8696a0]" />
+                <Copy className="w-5 h-5 text-[#54656f]" />
                 <span>Metni Kopyala</span>
               </button>
             )}
 
-            {/* Admin or Author Delete Message */}
+            {/* Delete Message */}
             {canDelete && (
               <button
                 onClick={() => {
                   onDeleteMessage(message);
                   onClose();
                 }}
-                className="w-full px-4 py-3.5 flex items-center gap-3.5 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 active:bg-red-500/20 transition"
+                className="w-full px-4 py-3 flex items-center gap-3.5 rounded-2xl text-sm font-medium text-red-700 bg-red-50 active:bg-red-100 transition"
               >
-                <Trash2 className="w-5 h-5 text-red-400" />
+                <Trash2 className="w-5 h-5 text-red-600" />
                 <span>Mesajı Sil {currentUser.role === 'ADMIN' && message.senderId !== currentUser.id ? '(Yönetici)' : ''}</span>
               </button>
             )}
 
             <button
               onClick={onClose}
-              className="w-full mt-2 py-3 rounded-xl text-xs font-semibold text-[#8696a0] hover:text-white bg-[#202c33]/50 transition"
+              className="w-full mt-2 py-2.5 rounded-xl text-xs font-semibold text-[#54656f] hover:text-[#111b21] bg-[#f0f2f5] transition"
             >
               Kapat
             </button>
@@ -151,10 +151,10 @@ export default function ContextMenu({
     <div
       ref={menuRef}
       style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-      className="fixed z-50 w-56 bg-[#202c33] border border-[#2a3942] rounded-2xl shadow-2xl overflow-hidden py-1.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 w-56 bg-white border border-[#e9edef] rounded-2xl shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100"
     >
       {/* Quick Emoji Reaction Bar */}
-      <div className="flex items-center justify-around px-2 py-2 border-b border-[#2a3942] bg-[#111b21]/50">
+      <div className="flex items-center justify-around px-2 py-2 border-b border-[#e9edef] bg-[#f0f2f5]">
         {EMOJIS.map((emoji) => (
           <button
             key={emoji}
@@ -162,7 +162,7 @@ export default function ContextMenu({
               onReaction(message.id, emoji);
               onClose();
             }}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-lg hover:scale-125 hover:bg-[#202c33] transition"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-lg hover:scale-125 hover:bg-white transition"
           >
             {emoji}
           </button>
@@ -176,9 +176,9 @@ export default function ContextMenu({
             onConvertToTask(message);
             onClose();
           }}
-          className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-emerald-400 hover:bg-[#00a884]/15 hover:text-[#00a884] transition text-left"
+          className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-semibold text-[#008069] hover:bg-emerald-50 transition text-left"
         >
-          <CheckSquare className="w-4 h-4 text-[#00a884]" />
+          <CheckSquare className="w-4 h-4 text-[#008069]" />
           <span>Göreve Dönüştür</span>
         </button>
 
@@ -187,18 +187,18 @@ export default function ContextMenu({
             onReply(message);
             onClose();
           }}
-          className="w-full px-4 py-2 flex items-center gap-3 text-xs text-[#e9edef] hover:bg-[#111b21] transition text-left"
+          className="w-full px-4 py-2 flex items-center gap-3 text-xs text-[#111b21] hover:bg-[#f0f2f5] transition text-left"
         >
-          <Reply className="w-4 h-4 text-[#8696a0]" />
+          <Reply className="w-4 h-4 text-[#54656f]" />
           <span>Yanıtla (Alıntıla)</span>
         </button>
 
         {message.content && (
           <button
             onClick={handleCopy}
-            className="w-full px-4 py-2 flex items-center gap-3 text-xs text-[#e9edef] hover:bg-[#111b21] transition text-left"
+            className="w-full px-4 py-2 flex items-center gap-3 text-xs text-[#111b21] hover:bg-[#f0f2f5] transition text-left"
           >
-            <Copy className="w-4 h-4 text-[#8696a0]" />
+            <Copy className="w-4 h-4 text-[#54656f]" />
             <span>Metni Kopyala</span>
           </button>
         )}
@@ -210,9 +210,9 @@ export default function ContextMenu({
               onDeleteMessage(message);
               onClose();
             }}
-            className="w-full px-4 py-2 flex items-center gap-3 text-xs text-red-400 hover:bg-red-500/15 transition text-left border-t border-[#2a3942]/60 mt-1"
+            className="w-full px-4 py-2 flex items-center gap-3 text-xs text-red-600 hover:bg-red-50 transition text-left border-t border-[#e9edef] mt-1"
           >
-            <Trash2 className="w-4 h-4 text-red-400" />
+            <Trash2 className="w-4 h-4 text-red-600" />
             <span>Mesajı Sil {currentUser.role === 'ADMIN' && message.senderId !== currentUser.id ? '(Yönetici)' : ''}</span>
           </button>
         )}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, User, Image, Check } from 'lucide-react';
+import { X, User, Settings, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { UserSession } from '@/lib/types';
 
 interface Props {
@@ -11,18 +11,32 @@ interface Props {
   onProfileUpdated: (user: UserSession) => void;
 }
 
-export default function UserProfileModal({ isOpen, onClose, currentUser, onProfileUpdated }: Props) {
+export default function UserProfileModal({
+  isOpen,
+  onClose,
+  currentUser,
+  onProfileUpdated,
+}: Props) {
   const [fullName, setFullName] = useState(currentUser.fullName);
-  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || '');
+  const [avatarSeed, setAvatarSeed] = useState(currentUser.fullName);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
 
+  const currentAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (!fullName.trim()) {
+      setError('İsim boş olamaz.');
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+    setSuccess(false);
 
     try {
       const token = localStorage.getItem('prjrms_token');
@@ -32,7 +46,10 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, onProfi
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ fullName, avatarUrl }),
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          avatarUrl: currentAvatar,
+        }),
       });
 
       const data = await res.json();
@@ -40,15 +57,12 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, onProfi
         throw new Error(data.error || 'Profil güncellenemedi');
       }
 
-      const updated = {
-        ...currentUser,
-        fullName: data.user.fullName,
-        avatarUrl: data.user.avatarUrl,
-      };
-
-      localStorage.setItem('prjrms_user', JSON.stringify(updated));
-      onProfileUpdated(updated);
-      onClose();
+      onProfileUpdated(data.user);
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+        setSuccess(false);
+      }, 800);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -56,89 +70,104 @@ export default function UserProfileModal({ isOpen, onClose, currentUser, onProfi
     }
   };
 
-  const presetAvatars = [
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(fullName || 'user1')}`,
-    `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(fullName || 'user2')}`,
-    `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(fullName || 'user3')}`,
-    `https://api.dicebear.com/7.x/personas/svg?seed=${encodeURIComponent(fullName || 'user4')}`,
-  ];
+  const randomizeAvatar = () => {
+    setAvatarSeed(Math.random().toString(36).substring(7));
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-[#111b21] border border-[#222e35] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#222e35] bg-[#202c33]/50">
-          <h2 className="text-base font-semibold text-white">Profil Düzenle</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-[#8696a0] hover:text-white hover:bg-[#202c33] transition">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150 overflow-y-auto">
+      <div className="bg-white border border-[#e9edef] rounded-3xl w-full max-w-[94vw] sm:max-w-md overflow-hidden shadow-2xl my-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#e9edef] bg-[#f0f2f5]">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-[#008069]/10 text-[#008069]">
+              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-semibold text-[#111b21]">Profil Ayarları</h2>
+              <p className="text-[10px] sm:text-xs text-[#54656f]">Kullanıcı bilgilerini düzenle</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[#54656f] hover:text-[#111b21] hover:bg-white transition"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
-              {error}
+            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Avatar Preview & Presets */}
-          <div className="flex flex-col items-center gap-3">
-            <img
-              src={avatarUrl || currentUser.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'}
-              alt={fullName}
-              className="w-20 h-20 rounded-full border-2 border-[#00a884] bg-[#202c33] object-cover"
-            />
-            <div className="flex items-center gap-2">
-              {presetAvatars.map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setAvatarUrl(preset)}
-                  className={`w-9 h-9 rounded-full border-2 overflow-hidden transition p-0.5 ${
-                    avatarUrl === preset ? 'border-[#00a884] scale-110' : 'border-transparent opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={preset} alt="preset" className="w-full h-full rounded-full bg-[#202c33]" />
-                </button>
-              ))}
+          {success && (
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-[#008069]" />
+              <span>Profil güncellendi!</span>
             </div>
+          )}
+
+          {/* Avatar Preview & Randomizer */}
+          <div className="flex flex-col items-center justify-center gap-2 py-2">
+            <div className="relative">
+              <img
+                src={currentAvatar}
+                alt="Avatar"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#008069] bg-[#f0f2f5] shadow-md object-cover"
+              />
+              <button
+                type="button"
+                onClick={randomizeAvatar}
+                className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#008069] text-white hover:bg-[#00705a] transition shadow"
+                title="Yeni Avatar Üret"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="text-[10px] text-[#54656f]">Avatarı değiştirmek için butona tıklayın</p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Ad Soyad</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">Ad Soyad</label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-2 text-sm text-[#e9edef] focus:outline-none focus:border-[#00a884]"
+              className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#111b21] focus:outline-none transition"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Avatar URL (Özel URL)</label>
+            <label className="block text-xs font-medium text-[#54656f] mb-1">E-Posta (Değiştirilemez)</label>
             <input
-              type="url"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl px-3.5 py-2 text-sm text-[#e9edef] focus:outline-none focus:border-[#00a884]"
+              type="text"
+              disabled
+              value={currentUser.email}
+              className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-gray-500 cursor-not-allowed"
             />
           </div>
 
-          <div className="pt-4 flex items-center justify-end gap-2.5">
+          {/* Footer Actions */}
+          <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-[#8696a0] hover:bg-[#202c33] hover:text-white transition"
+              className="px-3.5 py-2 rounded-xl text-xs font-medium text-[#54656f] hover:bg-[#f0f2f5] transition"
             >
-              İptal
+              Kapat
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-[#00a884] hover:bg-[#008f6f] text-[#111b21] transition disabled:opacity-50"
+              className="px-4 sm:px-5 py-2 rounded-xl text-xs font-semibold bg-[#008069] hover:bg-[#00705a] text-white transition shadow-md shadow-[#008069]/20 flex items-center gap-1.5 disabled:opacity-50"
             >
-              {loading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+              <span>{loading ? 'Kaydediliyor...' : 'Kaydet'}</span>
             </button>
           </div>
         </form>

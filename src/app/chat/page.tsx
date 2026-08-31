@@ -295,8 +295,8 @@ export default function ChatPage() {
 
   if (loading || !currentUser) {
     return (
-      <div className="min-h-screen bg-[#0b141a] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#008069] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -304,7 +304,7 @@ export default function ChatPage() {
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0];
 
   return (
-    <div className="h-[100dvh] w-screen flex bg-[#0b141a] text-[#e9edef] overflow-hidden">
+    <div className="h-[100dvh] w-screen flex bg-[#efeae2] text-[#111b21] overflow-hidden">
       {/* 1. Left Sidebar */}
       <Sidebar
         groups={groups}
@@ -347,7 +347,7 @@ export default function ChatPage() {
           >
             {/* Top Date Header */}
             <div className="flex justify-center my-2">
-              <span className="px-3 py-1 rounded-lg bg-[#111b21]/80 border border-[#222e35] text-[10px] sm:text-[11px] text-[#8696a0]">
+              <span className="px-3 py-1 rounded-full bg-white/90 border border-[#e9edef] text-[10px] sm:text-[11px] text-[#54656f] shadow-xs">
                 Bugün
               </span>
             </div>
@@ -380,10 +380,10 @@ export default function ChatPage() {
           />
         </main>
       ) : (
-        <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center ${activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f0f2f5] ${activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
           <MessageSquare className="w-16 h-16 text-[#8696a0]/40 mb-4" />
-          <h3 className="text-lg font-semibold text-white">Sohbet Seçin</h3>
-          <p className="text-xs text-[#8696a0] max-w-sm mt-1">
+          <h3 className="text-lg font-semibold text-[#111b21]">Sohbet Seçin</h3>
+          <p className="text-xs text-[#54656f] max-w-sm mt-1">
             Mesajlaşmaya başlamak veya görev oluşturmak için soldaki listeden bir sohbet grubu seçin.
           </p>
         </div>

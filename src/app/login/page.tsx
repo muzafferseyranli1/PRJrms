@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Shield, User, Lock, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
+import { Shield, MessageSquare, Lock, Mail, ArrowRight, AlertCircle, CheckCircle2, User } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,104 +11,106 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem('prjrms_token');
-    if (token) {
-      router.push('/chat');
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Lütfen tüm alanları doldurun');
+      return;
     }
-  }, [router]);
 
-  const handleLogin = async (e?: React.FormEvent, customEmail?: string, customPass?: string) => {
-    if (e) e.preventDefault();
-    setError(null);
     setLoading(true);
-
-    const loginEmail = customEmail || email;
-    const loginPass = customPass || password;
+    setError(null);
 
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPass }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Giriş yapılamadı');
+        throw new Error(data.error || 'Giriş başarısız oldu');
       }
 
       localStorage.setItem('prjrms_token', data.token);
       localStorage.setItem('prjrms_user', JSON.stringify(data.user));
       router.push('/chat');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Giriş işlemi sırasında hata oluştu');
     } finally {
       setLoading(false);
     }
   };
 
-  const quickUsers = [
-    { name: 'Admin', email: 'admin@prjrms.local', role: 'Sistem Yöneticisi', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin', color: 'from-emerald-500/20 to-teal-500/10' },
-    { name: 'Ahmet Yılmaz', email: 'ahmet@prjrms.local', role: 'Geliştirici', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ahmet', color: 'from-blue-500/20 to-indigo-500/10' },
-    { name: 'Mehmet Demir', email: 'mehmet@prjrms.local', role: 'Geliştirici', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=mehmet', color: 'from-purple-500/20 to-pink-500/10' },
-    { name: 'Ayşe Kaya', email: 'ayse@prjrms.local', role: 'Geliştirici', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ayse', color: 'from-amber-500/20 to-orange-500/10' },
-  ];
+  const quickLogin = (userEmail: string) => {
+    setEmail(userEmail);
+    setPassword('123456');
+  };
 
   return (
-    <div className="min-h-screen bg-[#0b141a] text-[#e9edef] flex flex-col justify-center items-center p-4 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-[#00a884]/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[#005c4b]/20 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-md w-full z-10">
-        {/* Header Branding */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#00a884]/20 border border-[#00a884]/30 mb-4 shadow-lg shadow-[#00a884]/10">
-            <MessageSquare className="w-8 h-8 text-[#00a884]" />
+    <div className="min-h-[100dvh] w-full flex items-center justify-center p-3 sm:p-4 bg-[#f0f2f5] select-none overflow-x-hidden">
+      <div className="w-full max-w-sm sm:max-w-md space-y-4 sm:space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <div className="inline-flex p-2.5 sm:p-3 rounded-2xl bg-[#008069] text-white shadow-lg shadow-[#008069]/25">
+            <MessageSquare className="w-7 h-7 sm:w-8 sm:h-8" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-2">
-            PRJrms <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#00a884]/20 text-[#00a884] border border-[#00a884]/30">Chat-to-Task</span>
-          </h1>
-          <p className="text-sm text-[#8696a0] mt-1">Ekip İçi Özel Mesajlaşma ve Görev Yönetimi</p>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111b21]">PRJrms</h1>
+            <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-[#008069]/10 text-[#008069] border border-[#008069]/30">
+              Chat-to-Task
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[#54656f]">
+            Ekip İçi Özel Mesajlaşma ve Görev Yönetimi
+          </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-[#111b21] border border-[#222e35] rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+        <div className="bg-white border border-[#e9edef] rounded-3xl p-5 sm:p-7 shadow-xl shadow-gray-200/50 space-y-4 sm:space-y-5">
           {error && (
-            <div className="mb-5 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-              {error}
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="leading-snug">{error}</span>
             </div>
           )}
 
-          <form onSubmit={(e) => handleLogin(e)} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3.5 sm:space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#8696a0] mb-1.5">E-Posta Adresi</label>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">
+                E-Posta Adresi
+              </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+                <div className="absolute inset-y-0 left-0 pl-3 sm:pl-3.5 flex items-center pointer-events-none text-[#8696a0]">
+                  <Mail className="w-4 h-4" />
+                </div>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="adiniz@prjrms.local"
+                  placeholder="ornek@prjrms.local"
                   required
-                  className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#e9edef] placeholder-[#8696a0]/60 focus:outline-none focus:border-[#00a884] transition"
+                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 bg-[#f0f2f5] border border-[#e9edef] rounded-xl text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:border-[#008069] focus:bg-white transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8696a0] mb-1.5">Şifre</label>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">
+                Şifre
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0]" />
+                <div className="absolute inset-y-0 left-0 pl-3 sm:pl-3.5 flex items-center pointer-events-none text-[#8696a0]">
+                  <Lock className="w-4 h-4" />
+                </div>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#e9edef] placeholder-[#8696a0]/60 focus:outline-none focus:border-[#00a884] transition"
+                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 bg-[#f0f2f5] border border-[#e9edef] rounded-xl text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:border-[#008069] focus:bg-white transition"
                 />
               </div>
             </div>
@@ -116,54 +118,92 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 bg-[#00a884] hover:bg-[#008f6f] text-[#111b21] font-semibold py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-[#00a884]/20 disabled:opacity-50"
+              className="w-full py-2.5 sm:py-3 px-4 bg-[#008069] hover:bg-[#00705a] text-white font-semibold rounded-xl text-xs sm:text-sm transition duration-150 shadow-md shadow-[#008069]/20 flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-[#111b21] border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Giriş Yap</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              <span>{loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Quick Demo Logins */}
-          <div className="mt-8 pt-6 border-t border-[#222e35]">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-[#8696a0] uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#00a884]" /> Hızlı Ekip Girişi (Demo)
-              </span>
-              <span className="text-[10px] text-[#8696a0] bg-[#202c33] px-2 py-0.5 rounded">Şifre: 123456</span>
+          {/* Quick Demo Login Section */}
+          <div className="pt-3 sm:pt-4 border-t border-[#e9edef] space-y-2.5">
+            <div className="flex items-center justify-between text-[10px] sm:text-xs text-[#54656f]">
+              <span className="font-semibold uppercase tracking-wider">Hızlı Ekip Girişi</span>
+              <span className="text-[#8696a0]">Şifre: 123456</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {quickUsers.map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(u.email);
-                    setPassword('123456');
-                    handleLogin(undefined, u.email, '123456');
-                  }}
-                  className="flex items-center gap-2.5 p-2 rounded-xl bg-[#202c33]/70 hover:bg-[#202c33] border border-[#2a3942] hover:border-[#00a884]/40 transition text-left group"
-                >
-                  <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full bg-[#111b21] border border-[#2a3942]" />
-                  <div className="overflow-hidden">
-                    <p className="text-xs font-medium text-white truncate group-hover:text-[#00a884] transition">{u.name}</p>
-                    <p className="text-[10px] text-[#8696a0] truncate">{u.role}</p>
-                  </div>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => quickLogin('admin@prjrms.local')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
+              >
+                <img
+                  src="https://api.dicebear.com/7.x/bottts/svg?seed=admin"
+                  alt="Admin"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Admin</p>
+                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Yönetici</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('ahmet@prjrms.local')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
+              >
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=ahmet"
+                  alt="Ahmet"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Ahmet Yılmaz</p>
+                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('mehmet@prjrms.local')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
+              >
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=mehmet"
+                  alt="Mehmet"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Mehmet Demir</p>
+                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin('ayse@prjrms.local')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
+              >
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=ayse"
+                  alt="Ayşe"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Ayşe Kaya</p>
+                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
+                </div>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-[#8696a0] mt-6 flex items-center justify-center gap-1">
-          <Shield className="w-3.5 h-3.5 text-[#00a884]" /> Self-Hosted VPS Güvenli İletişim Altyapısı
+        {/* Footer info */}
+        <p className="text-center text-[10px] sm:text-xs text-[#54656f] flex items-center justify-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-[#008069]" />
+          <span>Self-Hosted Güvenli İletişim Altyapısı</span>
         </p>
       </div>
     </div>
