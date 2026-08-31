@@ -327,6 +327,11 @@ app.prepare().then(() => {
         return res.status(400).json({ error: 'Grup adı zorunludur' });
       }
 
+      // memberIds'den currentUser.id'yi kesinlikle çıkar (duplicate önleme)
+      const safeMemberIds = Array.isArray(memberIds)
+        ? memberIds.filter((id: string) => id !== currentUser.id)
+        : [];
+
       const newGroup = await prisma.group.create({
         data: {
           name: name.trim(),
@@ -335,11 +340,7 @@ app.prepare().then(() => {
           members: {
             create: [
               { userId: currentUser.id, role: GroupRole.ADMIN },
-              ...(Array.isArray(memberIds)
-                ? memberIds
-                    .filter((id: string) => id !== currentUser.id)
-                    .map((id: string) => ({ userId: id, role: GroupRole.MEMBER }))
-                : []),
+              ...safeMemberIds.map((id: string) => ({ userId: id, role: GroupRole.MEMBER as any })),
             ],
           },
         },
@@ -372,8 +373,8 @@ app.prepare().then(() => {
 
       return res.status(201).json({ group: newGroup });
     } catch (err: any) {
-      console.error('Create group error:', err);
-      return res.status(500).json({ error: 'Grup oluşturulurken hata oluştu' });
+      console.error('Create group error:', err?.message || err);
+      return res.status(500).json({ error: err?.message || 'Grup oluşturulurken hata oluştu' });
     }
   });
 
