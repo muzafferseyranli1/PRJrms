@@ -9,6 +9,7 @@ import MessageInput from '@/components/chat/MessageInput';
 import ContextMenu from '@/components/chat/ContextMenu';
 import LightboxModal from '@/components/chat/LightboxModal';
 import CreateTaskModal from '@/components/task/CreateTaskModal';
+import CompleteTaskModal from '@/components/task/CompleteTaskModal';
 import TaskSidePanel from '@/components/task/TaskSidePanel';
 import { UserSession, GroupItem, MessageItem as MessageItemType, TaskItem } from '@/lib/types';
 import { getSocket, resetSocket } from '@/lib/socket';
@@ -34,6 +35,7 @@ export default function ChatPage() {
   const [replyingTo, setReplyingTo] = useState<MessageItemType | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: MessageItemType } | null>(null);
   const [createTaskMessage, setCreateTaskMessage] = useState<MessageItemType | null>(null);
+  const [completeTaskItem, setCompleteTaskItem] = useState<TaskItem | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -56,7 +58,6 @@ export default function ChatPage() {
       return;
     }
 
-    // Verify token with server
     fetch('/api/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -137,7 +138,6 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, newMsg]);
         setTimeout(scrollToBottom, 50);
       }
-      // Update group last message preview
       setGroups((prev) =>
         prev.map((g) => (g.id === newMsg.groupId ? { ...g, lastMessage: newMsg } : g))
       );
@@ -209,7 +209,7 @@ export default function ChatPage() {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.classList.remove('highlight-message');
-      void el.offsetWidth; // Trigger reflow
+      void el.offsetWidth;
       el.classList.add('highlight-message');
     }
   };
@@ -262,14 +262,14 @@ export default function ChatPage() {
 
   return (
     <div className="h-[100dvh] w-screen flex bg-[#0b141a] text-[#e9edef] overflow-hidden">
-      {/* 1. Left Sidebar: On mobile, visible when activeMobileView === 'sidebar'. On desktop, always visible */}
+      {/* 1. Left Sidebar */}
       <Sidebar
         groups={groups}
         activeGroupId={activeGroupId}
         onSelectGroup={(id) => {
           setActiveGroupId(id);
           setReplyingTo(null);
-          setActiveMobileView('chat'); // Switch to chat view on mobile
+          setActiveMobileView('chat');
         }}
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -278,7 +278,7 @@ export default function ChatPage() {
         className={`${activeMobileView === 'chat' ? 'hidden md:flex' : 'flex'}`}
       />
 
-      {/* 2. Main Chat Area: On mobile, visible when activeMobileView === 'chat'. On desktop, always visible */}
+      {/* 2. Main Chat Area */}
       {activeGroup ? (
         <main
           className={`flex-1 h-full flex flex-col relative chat-bg-pattern min-w-0 ${
@@ -318,6 +318,7 @@ export default function ChatPage() {
                 onImageClick={(url, name) => setLightboxImage({ url, name })}
                 onScrollToMessage={handleScrollToMessage}
                 onReactionClick={handleReaction}
+                onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -348,6 +349,7 @@ export default function ChatPage() {
         onClose={() => setIsTaskPanelOpen(false)}
         tasks={tasks}
         onScrollToMessage={handleScrollToMessage}
+        onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
       />
 
       {/* 4. Context Menu */}
@@ -374,7 +376,14 @@ export default function ChatPage() {
         />
       )}
 
-      {/* 6. Lightbox Preview Modal */}
+      {/* 6. 🌟 Complete Task Modal with Required Note & Auto Notification 🌟 */}
+      <CompleteTaskModal
+        isOpen={!!completeTaskItem}
+        onClose={() => setCompleteTaskItem(null)}
+        task={completeTaskItem}
+      />
+
+      {/* 7. Lightbox Preview Modal */}
       <LightboxModal
         imageUrl={lightboxImage ? lightboxImage.url : null}
         fileName={lightboxImage?.name}

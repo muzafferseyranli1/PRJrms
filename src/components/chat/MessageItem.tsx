@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { MoreVertical, CheckCheck, Download, FileText, CheckSquare, Calendar, User, CornerDownRight } from 'lucide-react';
-import { MessageItem as MessageItemType, UserSession, TaskStatus } from '@/lib/types';
+import { MessageItem as MessageItemType, UserSession, TaskStatus, TaskItem } from '@/lib/types';
 import { getSocket } from '@/lib/socket';
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   onImageClick: (url: string, name?: string) => void;
   onScrollToMessage: (messageId: string) => void;
   onReactionClick: (messageId: string, emoji: string) => void;
+  onRequestCompleteTask: (task: TaskItem) => void;
 }
 
 export default function MessageItem({
@@ -21,6 +22,7 @@ export default function MessageItem({
   onImageClick,
   onScrollToMessage,
   onReactionClick,
+  onRequestCompleteTask,
 }: Props) {
   const isMine = message.senderId === currentUser.id;
   const isSystem = message.type === 'SYSTEM';
@@ -39,6 +41,11 @@ export default function MessageItem({
   }
 
   const handleTaskStatusChange = (taskId: string, newStatus: TaskStatus) => {
+    if (newStatus === 'COMPLETED' && message.task) {
+      // 🌟 Zorunlu tamamlama notu için modalı aç
+      onRequestCompleteTask(message.task);
+      return;
+    }
     const socket = getSocket();
     socket.emit('update_task_status', { taskId, status: newStatus });
   };
@@ -49,10 +56,10 @@ export default function MessageItem({
     const coords = { clientX: touch.clientX, clientY: touch.clientY };
     longPressTimerRef.current = setTimeout(() => {
       if (window.navigator?.vibrate) {
-        window.navigator.vibrate(50); // Haptic feedback on mobile
+        window.navigator.vibrate(50);
       }
       onOpenContextMenu(coords, message);
-    }, 450); // 450ms long-press
+    }, 450);
   };
 
   const handleTouchEnd = () => {
@@ -143,7 +150,7 @@ export default function MessageItem({
                 <p className="text-[9px] sm:text-[10px] font-semibold text-[#00a884] truncate">
                   {message.replyTo.sender.fullName}
                 </p>
-                <p className="text-[10px] sm:text-[11px] text-[#8696a0] truncate mt-0.5">
+                <p className="text-[10px] sm:text-[11px] text-[#8696a0] truncate mt-0.5 whitespace-pre-line">
                   {message.replyTo.content || 'Ek / Medya'}
                 </p>
               </div>

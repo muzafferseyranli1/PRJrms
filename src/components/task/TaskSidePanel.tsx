@@ -10,6 +10,7 @@ interface Props {
   onClose: () => void;
   tasks: TaskItem[];
   onScrollToMessage: (messageId: string) => void;
+  onRequestCompleteTask: (task: TaskItem) => void;
 }
 
 export default function TaskSidePanel({
@@ -17,15 +18,20 @@ export default function TaskSidePanel({
   onClose,
   tasks,
   onScrollToMessage,
+  onRequestCompleteTask,
 }: Props) {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   if (!isOpen) return null;
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
+  const handleStatusChange = (task: TaskItem, newStatus: TaskStatus) => {
+    if (newStatus === 'COMPLETED') {
+      onRequestCompleteTask(task);
+      return;
+    }
     const socket = getSocket();
-    socket.emit('update_task_status', { taskId, status: newStatus });
+    socket.emit('update_task_status', { taskId: task.id, status: newStatus });
   };
 
   const filteredTasks = tasks.filter((t) => {
@@ -175,7 +181,7 @@ export default function TaskSidePanel({
                     onClick={() => {
                       onScrollToMessage(task.messageId);
                       if (window.innerWidth < 768) {
-                        onClose(); // Auto close panel on mobile when navigating to message
+                        onClose();
                       }
                     }}
                     title="Sohbette Mesaja Git"
@@ -219,7 +225,7 @@ export default function TaskSidePanel({
                   {/* Status Dropdown */}
                   <select
                     value={task.status}
-                    onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                    onChange={(e) => handleStatusChange(task, e.target.value as TaskStatus)}
                     className={`text-[10px] font-semibold rounded-lg px-2 py-1 border focus:outline-none transition ${
                       task.status === 'COMPLETED'
                         ? 'bg-[#00a884]/20 text-[#00a884] border-[#00a884]/40'

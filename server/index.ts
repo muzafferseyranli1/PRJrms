@@ -691,7 +691,7 @@ app.prepare().then(() => {
     });
 
     // Update Task Status
-    socket.on('update_task_status', async ({ taskId, status }: { taskId: string; status: TaskStatus }) => {
+    socket.on('update_task_status', async ({ taskId, status, completionNote }: { taskId: string; status: TaskStatus; completionNote?: string }) => {
       try {
         const updatedTask = await prisma.task.update({
           where: { id: taskId },
@@ -711,6 +711,38 @@ app.prepare().then(() => {
           messageId: updatedTask.messageId,
           task: updatedTask,
         });
+
+        // 🌟 GÖREV TAMAMLANDIĞINDA GRUBA OTOMATİK MESAJ AT 🌟
+        if (status === 'COMPLETED') {
+          const noteText = completionNote && completionNote.trim() ? completionNote.trim() : 'Görev başarıyla tamamlandı.';
+          const completionMsg = await prisma.message.create({
+            data: {
+              groupId: updatedTask.groupId,
+              senderId: user.id,
+              content: `✅ [GÖREV TAMAMLANDI] "${updatedTask.title}"\n📝 Tamamlama Notu: ${noteText}`,
+              type: MessageType.TEXT,
+              replyToId: updatedTask.messageId, // Orijinal mesaja yanıt olarak bağla
+            },
+            include: {
+              sender: {
+                select: { id: true, fullName: true, avatarUrl: true, role: true },
+              },
+              replyTo: {
+                select: {
+                  id: true,
+                  content: true,
+                  sender: { select: { id: true, fullName: true } },
+                },
+              },
+              attachments: true,
+              reactions: true,
+              task: true,
+            },
+          });
+
+          // Gruba otomatik mesajı yayınla
+          io.to(`group_${updatedTask.groupId}`).emit('new_message', completionMsg);
+        }
       } catch (err: any) {
         console.error('Update task status error:', err);
       }
