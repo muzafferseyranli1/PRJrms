@@ -1,0 +1,193 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// KULLANICI & YETKİLENDİRME
+// ==========================================
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  fullName      String
+  avatarUrl     String?
+  role          UserRole  @default(MEMBER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // İlişkiler
+  groupMemberships GroupMember[]
+  messagesSent     Message[]       @relation("SentMessages")
+  reactions        MessageReaction[]
+  
+  // Görev İlişkileri
+  assignedTasks    Task[]          @relation("AssignedTo")
+  createdTasks     Task[]          @relation("CreatedBy")
+
+  @@map("users")
+}
+
+// ==========================================
+// GRUP SOHBETİ & ÜYELİK
+// ==========================================
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // İlişkiler
+  members  GroupMember[]
+  messages Message[]
+  tasks    Task[]
+
+  @@map("groups")
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
+}
+
+model GroupMember {
+  id       String    @id @default(uuid())
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  group User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupRef Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+// ==========================================
+// MESAJLAŞMA SİSTEMİ
+// ==========================================
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM // "Ahmet bir görev oluşturdu" gibi sistem mesajları için
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  groupId   String
+  senderId  String
+  content   String?     @db.Text
+  type      MessageType @default(TEXT)
+  
+  // Yanıtlama (Reply) Mantığı
+  replyToId String?
+  replyTo   Message?    @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[]   @relation("MessageReplies")
+
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // İlişkiler
+  group       Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender      User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+  reactions   MessageReaction[]
+  
+  // Eğer bu mesaj bir göreve dönüştürüldüyse 1-to-1 ilişki
+  task        Task?
+
+  @@index([groupId, createdAt])
+  @@map("messages")
+}
+
+// Dosya ve Resim Ekleri
+model Attachment {
+  id        String   @id @default(uuid())
+  messageId String
+  fileUrl   String
+  fileName  String
+  fileSize  Int      // Byte cinsinden
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+// Emoji Tepkileri
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String   // örn: "👍", "❤️", "🔥"
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji]) // Bir kullanıcı aynı mesaja aynı emojiyi 1 kez atabilir
+  @@map("message_reactions")
+}
+
+// ==========================================
+// MESAJ TABANLI GÖREV YÖNETİMİ (CHAT-TO-TASK)
+// ==========================================
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  groupId     String
+  messageId   String       @unique // Görevin türetildiği orijinal mesaj
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+
+  createdById  String
+  assignedToId String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // İlişkiler
+  group      Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  message    Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignedTo User    @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([groupId, status])
+  @@index([assignedToId, status])
+  @@map("tasks")
+}

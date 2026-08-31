@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 233, 237, 239;
+  --background-start-rgb: 11, 20, 26;
+  --background-end-rgb: 17, 27, 33;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(134, 150, 160, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(134, 150, 160, 0.45);
+}
+
+/* Highlight message animation */
+@keyframes highlightFlash {
+  0% {
+    background-color: rgba(0, 168, 132, 0.4);
+    box-shadow: 0 0 20px rgba(0, 168, 132, 0.6);
+  }
+  50% {
+    background-color: rgba(0, 168, 132, 0.25);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.highlight-message {
+  animation: highlightFlash 2.5s ease-out;
+  border-radius: 10px;
+}
+
+/* WhatsApp Pattern Background */
+.chat-bg-pattern {
+  background-color: #0b141a;
+  background-image: radial-gradient(#182229 1px, transparent 1px);
+  background-size: 20px 20px;
+}

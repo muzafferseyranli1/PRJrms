@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # 1. PRJrms App (Next.js + Socket.io Server)
+  prjrms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prjrms_app
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public
+      - JWT_SECRET=prjrms_super_secret_jwt_key_2026_x1892_production
+      - PORT=3005
+      - NEXT_PUBLIC_APP_URL=http://188.132.198.144:3005
+      - NODE_ENV=production
+    ports:
+      - "3005:3005"
+    volumes:
+      - prjrms_uploads:/app/public/uploads
+
+volumes:
+  prjrms_uploads:
+    driver: local
