@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { CheckSquare, Reply, Copy, X } from 'lucide-react';
-import { MessageItem } from '@/lib/types';
+import { CheckSquare, Reply, Copy, Trash2, X } from 'lucide-react';
+import { MessageItem, UserSession } from '@/lib/types';
 
 interface Props {
   x: number;
   y: number;
   message: MessageItem;
+  currentUser: UserSession;
   onClose: () => void;
   onConvertToTask: (msg: MessageItem) => void;
   onReply: (msg: MessageItem) => void;
   onReaction: (messageId: string, emoji: string) => void;
+  onDeleteMessage: (msg: MessageItem) => void;
 }
 
 const EMOJIS = ['👍', '❤️', '🔥', '✅', '👀'];
@@ -20,13 +22,17 @@ export default function ContextMenu({
   x,
   y,
   message,
+  currentUser,
   onClose,
   onConvertToTask,
   onReply,
   onReaction,
+  onDeleteMessage,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  const canDelete = currentUser.role === 'ADMIN' || message.senderId === currentUser.id;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
@@ -51,7 +57,7 @@ export default function ContextMenu({
     onClose();
   };
 
-  // On mobile: render as a Bottom Sheet
+  // On mobile: render as Bottom Sheet
   if (isMobile) {
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs p-0 animate-in fade-in duration-150">
@@ -59,7 +65,6 @@ export default function ContextMenu({
           ref={menuRef}
           className="w-full bg-[#111b21] border-t border-[#222e35] rounded-t-3xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-200"
         >
-          {/* Grab Handle */}
           <div className="w-10 h-1 rounded-full bg-[#2a3942] mx-auto mb-3" />
 
           {/* Quick Emoji Bar */}
@@ -112,6 +117,20 @@ export default function ContextMenu({
               </button>
             )}
 
+            {/* Admin or Author Delete Message */}
+            {canDelete && (
+              <button
+                onClick={() => {
+                  onDeleteMessage(message);
+                  onClose();
+                }}
+                className="w-full px-4 py-3.5 flex items-center gap-3.5 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 active:bg-red-500/20 transition"
+              >
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <span>Mesajı Sil {currentUser.role === 'ADMIN' && message.senderId !== currentUser.id ? '(Yönetici)' : ''}</span>
+              </button>
+            )}
+
             <button
               onClick={onClose}
               className="w-full mt-2 py-3 rounded-xl text-xs font-semibold text-[#8696a0] hover:text-white bg-[#202c33]/50 transition"
@@ -126,7 +145,7 @@ export default function ContextMenu({
 
   // Desktop floating context menu
   const adjustedX = Math.min(x, typeof window !== 'undefined' ? window.innerWidth - 230 : x);
-  const adjustedY = Math.min(y, typeof window !== 'undefined' ? window.innerHeight - 270 : y);
+  const adjustedY = Math.min(y, typeof window !== 'undefined' ? window.innerHeight - 280 : y);
 
   return (
     <div
@@ -181,6 +200,20 @@ export default function ContextMenu({
           >
             <Copy className="w-4 h-4 text-[#8696a0]" />
             <span>Metni Kopyala</span>
+          </button>
+        )}
+
+        {/* Delete Message Option */}
+        {canDelete && (
+          <button
+            onClick={() => {
+              onDeleteMessage(message);
+              onClose();
+            }}
+            className="w-full px-4 py-2 flex items-center gap-3 text-xs text-red-400 hover:bg-red-500/15 transition text-left border-t border-[#2a3942]/60 mt-1"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" />
+            <span>Mesajı Sil {currentUser.role === 'ADMIN' && message.senderId !== currentUser.id ? '(Yönetici)' : ''}</span>
           </button>
         )}
       </div>

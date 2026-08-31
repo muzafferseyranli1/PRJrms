@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { MoreVertical, CheckCheck, Download, FileText, CheckSquare, Calendar, User, CornerDownRight } from 'lucide-react';
+import { MoreVertical, CheckCheck, Download, FileText, CheckSquare, Calendar, User, CornerDownRight, Edit3 } from 'lucide-react';
 import { MessageItem as MessageItemType, UserSession, TaskStatus, TaskItem } from '@/lib/types';
 import { getSocket } from '@/lib/socket';
 
@@ -13,6 +13,7 @@ interface Props {
   onScrollToMessage: (messageId: string) => void;
   onReactionClick: (messageId: string, emoji: string) => void;
   onRequestCompleteTask: (task: TaskItem) => void;
+  onEditTask: (task: TaskItem) => void;
 }
 
 export default function MessageItem({
@@ -23,6 +24,7 @@ export default function MessageItem({
   onScrollToMessage,
   onReactionClick,
   onRequestCompleteTask,
+  onEditTask,
 }: Props) {
   const isMine = message.senderId === currentUser.id;
   const isSystem = message.type === 'SYSTEM';
@@ -42,7 +44,6 @@ export default function MessageItem({
 
   const handleTaskStatusChange = (taskId: string, newStatus: TaskStatus) => {
     if (newStatus === 'COMPLETED' && message.task) {
-      // 🌟 Zorunlu tamamlama notu için modalı aç
       onRequestCompleteTask(message.task);
       return;
     }
@@ -217,25 +218,36 @@ export default function MessageItem({
                   <span className="text-[11px] sm:text-xs font-bold text-[#e9edef] truncate">{message.task.title}</span>
                 </div>
 
-                {/* Status Dropdown inside message card */}
-                <select
-                  value={message.task.status}
-                  onChange={(e) => handleTaskStatusChange(message.task!.id, e.target.value as TaskStatus)}
-                  className={`text-[9px] sm:text-[10px] font-semibold rounded-lg px-1.5 py-0.5 border focus:outline-none transition flex-shrink-0 ${
-                    message.task.status === 'COMPLETED'
-                      ? 'bg-[#00a884]/20 text-[#00a884] border-[#00a884]/40'
-                      : message.task.status === 'IN_PROGRESS'
-                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                      : message.task.status === 'CANCELLED'
-                      ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                      : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                  }`}
-                >
-                  <option value="PENDING">Bekliyor</option>
-                  <option value="IN_PROGRESS">Devam Ediyor</option>
-                  <option value="COMPLETED">Tamamlandı</option>
-                  <option value="CANCELLED">İptal</option>
-                </select>
+                <div className="flex items-center gap-1">
+                  {/* Edit Task Button */}
+                  <button
+                    onClick={() => onEditTask(message.task!)}
+                    title="Görevi Düzenle"
+                    className="p-1 rounded bg-[#202c33] text-[#8696a0] hover:text-[#00a884] transition"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+
+                  {/* Status Dropdown inside message card */}
+                  <select
+                    value={message.task.status}
+                    onChange={(e) => handleTaskStatusChange(message.task!.id, e.target.value as TaskStatus)}
+                    className={`text-[9px] sm:text-[10px] font-semibold rounded-lg px-1.5 py-0.5 border focus:outline-none transition flex-shrink-0 ${
+                      message.task.status === 'COMPLETED'
+                        ? 'bg-[#00a884]/20 text-[#00a884] border-[#00a884]/40'
+                        : message.task.status === 'IN_PROGRESS'
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                        : message.task.status === 'CANCELLED'
+                        ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                    }`}
+                  >
+                    <option value="PENDING">Bekliyor</option>
+                    <option value="IN_PROGRESS">Devam Ediyor</option>
+                    <option value="COMPLETED">Tamamlandı</option>
+                    <option value="CANCELLED">İptal</option>
+                  </select>
+                </div>
               </div>
 
               {/* Task Details Pill */}
@@ -270,7 +282,7 @@ export default function MessageItem({
         <button
           onClick={(e) => onOpenContextMenu(e, message)}
           className="hidden sm:block absolute top-1 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-full bg-black/40 text-white hover:bg-black/60 transition shadow"
-          title="Seçenekler & Göreve Dönüştür"
+          title="Seçenekler"
         >
           <MoreVertical className="w-3.5 h-3.5" />
         </button>

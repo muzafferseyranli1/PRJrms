@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckSquare, Clock, User, Calendar, AlertCircle, ArrowUpRight, CheckCircle2, PlayCircle, XCircle } from 'lucide-react';
+import { X, CheckSquare, Clock, User, Calendar, AlertCircle, ArrowUpRight, CheckCircle2, PlayCircle, XCircle, Edit3 } from 'lucide-react';
 import { TaskItem, TaskStatus } from '@/lib/types';
 import { getSocket } from '@/lib/socket';
 
@@ -11,6 +11,7 @@ interface Props {
   tasks: TaskItem[];
   onScrollToMessage: (messageId: string) => void;
   onRequestCompleteTask: (task: TaskItem) => void;
+  onEditTask: (task: TaskItem) => void;
 }
 
 export default function TaskSidePanel({
@@ -19,6 +20,7 @@ export default function TaskSidePanel({
   tasks,
   onScrollToMessage,
   onRequestCompleteTask,
+  onEditTask,
 }: Props) {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,21 +176,30 @@ export default function TaskSidePanel({
                 key={task.id}
                 className="bg-[#202c33]/70 hover:bg-[#202c33] border border-[#2a3942] hover:border-[#00a884]/40 rounded-xl p-3.5 transition group"
               >
-                {/* Top Row: Title & Scroll to Message */}
+                {/* Top Row: Title, Edit Button & Scroll to Message */}
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="text-xs font-semibold text-[#e9edef] leading-snug">{task.title}</h4>
-                  <button
-                    onClick={() => {
-                      onScrollToMessage(task.messageId);
-                      if (window.innerWidth < 768) {
-                        onClose();
-                      }
-                    }}
-                    title="Sohbette Mesaja Git"
-                    className="p-1 rounded bg-[#111b21] text-[#8696a0] hover:text-[#00a884] hover:bg-[#2a3942] transition flex-shrink-0"
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => onEditTask(task)}
+                      title="Görevi Düzenle"
+                      className="p-1 rounded bg-[#111b21] text-[#8696a0] hover:text-[#00a884] hover:bg-[#2a3942] transition"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        onScrollToMessage(task.messageId);
+                        if (window.innerWidth < 768) {
+                          onClose();
+                        }
+                      }}
+                      title="Sohbette Mesaja Git"
+                      className="p-1 rounded bg-[#111b21] text-[#8696a0] hover:text-[#00a884] hover:bg-[#2a3942] transition"
+                    >
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {task.description && (

@@ -10,6 +10,7 @@ import ContextMenu from '@/components/chat/ContextMenu';
 import LightboxModal from '@/components/chat/LightboxModal';
 import CreateTaskModal from '@/components/task/CreateTaskModal';
 import CompleteTaskModal from '@/components/task/CompleteTaskModal';
+import EditTaskModal from '@/components/task/EditTaskModal';
 import TaskSidePanel from '@/components/task/TaskSidePanel';
 import { UserSession, GroupItem, MessageItem as MessageItemType, TaskItem } from '@/lib/types';
 import { getSocket, resetSocket } from '@/lib/socket';
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: MessageItemType } | null>(null);
   const [createTaskMessage, setCreateTaskMessage] = useState<MessageItemType | null>(null);
   const [completeTaskItem, setCompleteTaskItem] = useState<TaskItem | null>(null);
+  const [editTaskItem, setEditTaskItem] = useState<TaskItem | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -143,6 +145,21 @@ export default function ChatPage() {
       );
     };
 
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setTasks((prev) => prev.filter((t) => t.messageId !== messageId));
+    };
+
+    const handleGroupDeleted = ({ groupId }: { groupId: string }) => {
+      setGroups((prev) => prev.filter((g) => g.id !== groupId));
+      if (activeGroupId === groupId) {
+        setActiveGroupId(null);
+        setMessages([]);
+        setTasks([]);
+        setActiveMobileView('sidebar');
+      }
+    };
+
     const handleReactionsUpdated = ({ messageId, reactions }: { messageId: string; reactions: any[] }) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
@@ -182,6 +199,8 @@ export default function ChatPage() {
     };
 
     socket.on('new_message', handleNewMessage);
+    socket.on('message_deleted', handleMessageDeleted);
+    socket.on('group_deleted', handleGroupDeleted);
     socket.on('message_reactions_updated', handleReactionsUpdated);
     socket.on('task_created', handleTaskCreated);
     socket.on('task_updated', handleTaskUpdated);
@@ -191,6 +210,8 @@ export default function ChatPage() {
     return () => {
       socket.emit('leave_group', activeGroupId);
       socket.off('new_message', handleNewMessage);
+      socket.off('message_deleted', handleMessageDeleted);
+      socket.off('group_deleted', handleGroupDeleted);
       socket.off('message_reactions_updated', handleReactionsUpdated);
       socket.off('task_created', handleTaskCreated);
       socket.off('task_updated', handleTaskUpdated);
@@ -224,6 +245,28 @@ export default function ChatPage() {
       replyToId,
       attachments,
     });
+  };
+
+  const handleDeleteMessage = (msg: MessageItemType) => {
+    const socket = getSocket();
+    socket.emit('delete_message', { messageId: msg.id });
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    const token = localStorage.getItem('prjrms_token');
+    try {
+      const res = await fetch(`/api/groups/${groupId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        fetchGroups();
+        setActiveGroupId(null);
+        setActiveMobileView('sidebar');
+      }
+    } catch (err) {
+      console.error('Delete group error:', err);
+    }
   };
 
   const handleReaction = (messageId: string, emoji: string) => {
@@ -292,7 +335,9 @@ export default function ChatPage() {
             isTaskPanelOpen={isTaskPanelOpen}
             onToggleTaskPanel={() => setIsTaskPanelOpen(!isTaskPanelOpen)}
             typingUsers={typingUsers}
+            currentUser={currentUser}
             onBackToSidebar={() => setActiveMobileView('sidebar')}
+            onDeleteGroup={handleDeleteGroup}
           />
 
           {/* Messages Scroll Area */}
@@ -319,6 +364,7 @@ export default function ChatPage() {
                 onScrollToMessage={handleScrollToMessage}
                 onReactionClick={handleReaction}
                 onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
+                onEditTask={(task) => setEditTaskItem(task)}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -350,6 +396,7 @@ export default function ChatPage() {
         tasks={tasks}
         onScrollToMessage={handleScrollToMessage}
         onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
+        onEditTask={(task) => setEditTaskItem(task)}
       />
 
       {/* 4. Context Menu */}
@@ -358,10 +405,12 @@ export default function ChatPage() {
           x={contextMenu.x}
           y={contextMenu.y}
           message={contextMenu.message}
+          currentUser={currentUser}
           onClose={() => setContextMenu(null)}
           onConvertToTask={(msg) => setCreateTaskMessage(msg)}
           onReply={(msg) => setReplyingTo(msg)}
           onReaction={handleReaction}
+          onDeleteMessage={handleDeleteMessage}
         />
       )}
 
@@ -376,14 +425,24 @@ export default function ChatPage() {
         />
       )}
 
-      {/* 6. 🌟 Complete Task Modal with Required Note & Auto Notification 🌟 */}
+      {/* 6. Edit Task Modal */}
+      {activeGroup && (
+        <EditTaskModal
+          isOpen={!!editTaskItem}
+          onClose={() => setEditTaskItem(null)}
+          task={editTaskItem}
+          members={activeGroup.members}
+        />
+      )}
+
+      {/* 7. Complete Task Modal with Required Note & Auto Notification */}
       <CompleteTaskModal
         isOpen={!!completeTaskItem}
         onClose={() => setCompleteTaskItem(null)}
         task={completeTaskItem}
       />
 
-      {/* 7. Lightbox Preview Modal */}
+      {/* 8. Lightbox Preview Modal */}
       <LightboxModal
         imageUrl={lightboxImage ? lightboxImage.url : null}
         fileName={lightboxImage?.name}

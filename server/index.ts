@@ -374,6 +374,37 @@ app.prepare().then(() => {
     }
   });
 
+  // 5.3 Groups: Delete Group (Admin or Group Creator)
+  server.delete('/api/groups/:groupId', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const currentUser = (req as any).user;
+      const { groupId } = req.params;
+
+      if (currentUser.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Sadece yöneticiler grupları silebilir' });
+      }
+
+      const existingGroup = await prisma.group.findUnique({
+        where: { id: groupId },
+      });
+
+      if (!existingGroup) {
+        return res.status(404).json({ error: 'Grup bulunamadı' });
+      }
+
+      await prisma.group.delete({
+        where: { id: groupId },
+      });
+
+      io.to(`group_${groupId}`).emit('group_deleted', { groupId });
+
+      return res.json({ success: true, message: 'Grup başarıyla silindi' });
+    } catch (err: any) {
+      console.error('Delete group error:', err);
+      return res.status(500).json({ error: 'Grup silinirken hata oluştu' });
+    }
+  });
+
   // 6. Messages: List Group Messages
   server.get('/api/groups/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
     try {
@@ -770,9 +801,125 @@ app.prepare().then(() => {
       }
     });
 
-    // Update Task Status
-    socket.on('update_task_status', async ({ taskId, status, completionNote }: { taskId: string; status: TaskStatus; completionNote?: string }) => {
+    // Delete Message (Admin or Message Author)
+    socket.on('delete_message', async ({ messageId }: { messageId: string }) => {
       try {
+        const msg = await prisma.message.findUnique({
+          where: { id: messageId },
+        });
+
+        if (!msg) return;
+
+        if (user.role !== 'ADMIN' && msg.senderId !== user.id) {
+          return socket.emit('error_message', { message: 'Bu mesajı silme yetkiniz yok' });
+        }
+
+        await prisma.message.delete({
+          where: { id: messageId },
+        });
+
+        io.to(`group_${msg.groupId}`).emit('message_deleted', {
+          messageId,
+          groupId: msg.groupId,
+        });
+      } catch (err: any) {
+        console.error('Delete message socket error:', err);
+      }
+    });
+
+    // Edit Task (Admin, Creator, or Assignee)
+    socket.on('edit_task', async (data: {
+      taskId: string;
+      title: string;
+      description?: string;
+      assignedToId: string;
+      dueDate?: string;
+      priority: TaskPriority;
+      status: TaskStatus;
+      reopenNote?: string;
+    }) => {
+      try {
+        const currentTask = await prisma.task.findUnique({
+          where: { id: data.taskId },
+          include: { assignedTo: true },
+        });
+
+        if (!currentTask) return;
+
+        const wasClosed = currentTask.status === 'COMPLETED' || currentTask.status === 'CANCELLED';
+        const isReopened = wasClosed && (data.status === 'PENDING' || data.status === 'IN_PROGRESS');
+
+        const updatedTask = await prisma.task.update({
+          where: { id: data.taskId },
+          data: {
+            title: data.title.trim(),
+            description: data.description ? data.description.trim() : null,
+            assignedToId: data.assignedToId,
+            priority: data.priority as TaskPriority,
+            status: data.status as TaskStatus,
+            dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          },
+          include: {
+            assignedTo: {
+              select: { id: true, fullName: true, avatarUrl: true },
+            },
+            createdBy: {
+              select: { id: true, fullName: true, avatarUrl: true },
+            },
+          },
+        });
+
+        io.to(`group_${updatedTask.groupId}`).emit('task_updated', updatedTask);
+        io.to(`group_${updatedTask.groupId}`).emit('message_task_updated', {
+          messageId: updatedTask.messageId,
+          task: updatedTask,
+        });
+
+        // 🌟 GÖREV YENİDEN AÇILDIĞINDA GRUBA MESAJ AT 🌟
+        if (isReopened) {
+          const dateStr = updatedTask.dueDate
+            ? new Date(updatedTask.dueDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+            : 'Belirtilmedi';
+
+          const reopenMsg = await prisma.message.create({
+            data: {
+              groupId: updatedTask.groupId,
+              senderId: user.id,
+              content: `🔄 [GÖREV YENİDEN AÇILDI] "${updatedTask.title}"\n👤 Atanan: ${updatedTask.assignedTo?.fullName || 'Ekip Üyesi'}\n📅 Yeni Bitiş: ${dateStr}\n📝 Not: ${data.reopenNote || 'Görev yönetici tarafından yeniden aktif hale getirildi.'}`,
+              type: MessageType.TEXT,
+              replyToId: updatedTask.messageId,
+            },
+            include: {
+              sender: {
+                select: { id: true, fullName: true, avatarUrl: true, role: true },
+              },
+              replyTo: {
+                select: {
+                  id: true,
+                  content: true,
+                  sender: { select: { id: true, fullName: true } },
+                },
+              },
+              attachments: true,
+              reactions: true,
+              task: true,
+            },
+          });
+
+          io.to(`group_${updatedTask.groupId}`).emit('new_message', reopenMsg);
+        }
+      } catch (err: any) {
+        console.error('Edit task socket error:', err);
+      }
+    });
+
+    // Update Task Status
+    socket.on('update_task_status', async ({ taskId, status, completionNote, reopenNote }: { taskId: string; status: TaskStatus; completionNote?: string; reopenNote?: string }) => {
+      try {
+        const oldTask = await prisma.task.findUnique({ where: { id: taskId } });
+        const wasClosed = oldTask ? (oldTask.status === 'COMPLETED' || oldTask.status === 'CANCELLED') : false;
+        const isReopening = wasClosed && (status === 'PENDING' || status === 'IN_PROGRESS');
+
         const updatedTask = await prisma.task.update({
           where: { id: taskId },
           data: { status: status as TaskStatus },
@@ -801,7 +948,7 @@ app.prepare().then(() => {
               senderId: user.id,
               content: `✅ [GÖREV TAMAMLANDI] "${updatedTask.title}"\n📝 Tamamlama Notu: ${noteText}`,
               type: MessageType.TEXT,
-              replyToId: updatedTask.messageId, // Orijinal mesaja yanıt olarak bağla
+              replyToId: updatedTask.messageId,
             },
             include: {
               sender: {
@@ -820,8 +967,37 @@ app.prepare().then(() => {
             },
           });
 
-          // Gruba otomatik mesajı yayınla
           io.to(`group_${updatedTask.groupId}`).emit('new_message', completionMsg);
+        }
+
+        // 🌟 GÖREV YENİDEN AÇILDIĞINDA GRUBA OTOMATİK MESAJ AT 🌟
+        if (isReopening) {
+          const reopenMsg = await prisma.message.create({
+            data: {
+              groupId: updatedTask.groupId,
+              senderId: user.id,
+              content: `🔄 [GÖREV YENİDEN AÇILDI] "${updatedTask.title}"\n👤 Atanan: ${updatedTask.assignedTo?.fullName || 'Ekip Üyesi'}\n📌 Yeni Durum: ${status === 'IN_PROGRESS' ? 'Devam Ediyor' : 'Bekliyor'}\n📝 Not: ${reopenNote || 'Görev yeniden aktif hale getirildi.'}`,
+              type: MessageType.TEXT,
+              replyToId: updatedTask.messageId,
+            },
+            include: {
+              sender: {
+                select: { id: true, fullName: true, avatarUrl: true, role: true },
+              },
+              replyTo: {
+                select: {
+                  id: true,
+                  content: true,
+                  sender: { select: { id: true, fullName: true } },
+                },
+              },
+              attachments: true,
+              reactions: true,
+              task: true,
+            },
+          });
+
+          io.to(`group_${updatedTask.groupId}`).emit('new_message', reopenMsg);
         }
       } catch (err: any) {
         console.error('Update task status error:', err);
