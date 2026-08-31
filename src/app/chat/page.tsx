@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/sidebar/Sidebar';
-import ChatHeader from '@/components/chat/ChatHeader';
+import ChatHeader, { MainViewType } from '@/components/chat/ChatHeader';
 import MessageItem from '@/components/chat/MessageItem';
 import MessageInput from '@/components/chat/MessageInput';
 import ContextMenu from '@/components/chat/ContextMenu';
@@ -12,8 +12,16 @@ import CreateTaskModal from '@/components/task/CreateTaskModal';
 import CompleteTaskModal from '@/components/task/CompleteTaskModal';
 import EditTaskModal from '@/components/task/EditTaskModal';
 import TaskSidePanel from '@/components/task/TaskSidePanel';
-import { UserSession, GroupItem, MessageItem as MessageItemType, TaskItem } from '@/lib/types';
-import { getSocket, resetSocket } from '@/lib/socket';
+import TaskKanbanView from '@/components/task/TaskKanbanView';
+import TaskGridView from '@/components/task/TaskGridView';
+import {
+  UserSession,
+  GroupItem,
+  MessageItem as MessageItemType,
+  TaskItem,
+  TaskStatus,
+} from '@/lib/types';
+import { getSocket } from '@/lib/socket';
 import { MessageSquare, Shield, CheckSquare } from 'lucide-react';
 
 export default function ChatPage() {
@@ -27,6 +35,9 @@ export default function ChatPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // View State: 'chat' | 'kanban' | 'table'
+  const [currentView, setCurrentView] = useState<MainViewType>('chat');
 
   // Mobile View Navigation State: 'sidebar' (list) or 'chat' (active conversation)
   const [activeMobileView, setActiveMobileView] = useState<'sidebar' | 'chat'>('sidebar');
@@ -168,7 +179,7 @@ export default function ChatPage() {
 
     const handleTaskCreated = (newTask: TaskItem) => {
       if (newTask.groupId === activeGroupId) {
-        setTasks((prev) => [newTask, ...prev]);
+        setTasks((prev) => [newTask, ...prev.filter((t) => t.id !== newTask.id)]);
       }
     };
 
@@ -229,27 +240,54 @@ export default function ChatPage() {
     const el = document.getElementById(`msg-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.remove('highlight-message');
-      void el.offsetWidth;
-      el.classList.add('highlight-message');
+      el.classList.add('bg-[#008069]/15', 'ring-2', 'ring-[#008069]', 'transition-all', 'duration-500');
+      setTimeout(() => {
+        el.classList.remove('bg-[#008069]/15', 'ring-2', 'ring-[#008069]');
+      }, 2500);
     }
   };
 
-  // Actions
+  // Jump from Kanban/Table directly to Chat and highlight the message
+  const handleJumpToMessage = (messageId: string) => {
+    setCurrentView('chat');
+    setTimeout(() => {
+      handleScrollToMessage(messageId);
+    }, 150);
+  };
+
+  // Direct status change from Kanban / Grid
+  const handleDirectStatusChange = (taskId: string, newStatus: TaskStatus) => {
+    if (newStatus === 'COMPLETED') {
+      const task = tasks.find((t) => t.id === taskId);
+      if (task) {
+        setCompleteTaskItem(task);
+        return;
+      }
+    }
+
+    const socket = getSocket();
+    socket.emit('edit_task', {
+      taskId,
+      status: newStatus,
+    });
+  };
+
   const handleSendMessage = (content?: string, attachments?: any[], replyToId?: string) => {
     if (!activeGroupId) return;
     const socket = getSocket();
     socket.emit('send_message', {
       groupId: activeGroupId,
-      content,
-      replyToId,
+      content: content || null,
+      type: attachments && attachments.length > 0 ? (attachments[0].mimeType?.startsWith('image/') ? 'IMAGE' : 'FILE') : 'TEXT',
+      replyToId: replyToId || replyingTo?.id,
       attachments,
     });
+    setReplyingTo(null);
   };
 
-  const handleDeleteMessage = (msg: MessageItemType) => {
+  const handleDeleteMessage = (messageId: string) => {
     const socket = getSocket();
-    socket.emit('delete_message', { messageId: msg.id });
+    socket.emit('delete_message', { messageId });
   };
 
   const handleDeleteGroup = async (groupId: string) => {
@@ -289,14 +327,16 @@ export default function ChatPage() {
   const handleLogout = () => {
     localStorage.removeItem('prjrms_token');
     localStorage.removeItem('prjrms_user');
-    resetSocket();
     router.push('/login');
   };
 
   if (loading || !currentUser) {
     return (
-      <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#008069] border-t-transparent rounded-full animate-spin" />
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-[#f0f2f5]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-[#008069] border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-medium text-[#54656f]">PRJrms Yükleniyor...</p>
+        </div>
       </div>
     );
   }
@@ -321,14 +361,14 @@ export default function ChatPage() {
         className={`${activeMobileView === 'chat' ? 'hidden md:flex' : 'flex'}`}
       />
 
-      {/* 2. Main Chat Area */}
+      {/* 2. Main Area (Chat | Kanban | Plan Tablosu) */}
       {activeGroup ? (
         <main
           className={`flex-1 h-full flex flex-col relative chat-bg-pattern min-w-0 ${
             activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'
           }`}
         >
-          {/* Chat Header */}
+          {/* Chat / View Header */}
           <ChatHeader
             group={activeGroup}
             taskCount={tasks.length}
@@ -336,48 +376,80 @@ export default function ChatPage() {
             onToggleTaskPanel={() => setIsTaskPanelOpen(!isTaskPanelOpen)}
             typingUsers={typingUsers}
             currentUser={currentUser}
+            currentView={currentView}
+            onChangeView={(view) => setCurrentView(view)}
             onBackToSidebar={() => setActiveMobileView('sidebar')}
             onDeleteGroup={handleDeleteGroup}
           />
 
-          {/* Messages Scroll Area */}
-          <div
-            ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-1"
-          >
-            {/* Top Date Header */}
-            <div className="flex justify-center my-2">
-              <span className="px-3 py-1 rounded-full bg-white/90 border border-[#e9edef] text-[10px] sm:text-[11px] text-[#54656f] shadow-xs">
-                Bugün
-              </span>
-            </div>
+          {/* VIEW 1: CHAT STREAM */}
+          {currentView === 'chat' && (
+            <>
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-1"
+              >
+                {/* Top Date Header */}
+                <div className="flex justify-center my-2">
+                  <span className="px-3 py-1 rounded-full bg-white/90 border border-[#e9edef] text-[10px] sm:text-[11px] text-[#54656f] shadow-xs">
+                    Bugün
+                  </span>
+                </div>
 
-            {messages.map((msg) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                currentUser={currentUser}
-                onOpenContextMenu={(coords, m) => {
-                  setContextMenu({ x: coords.clientX, y: coords.clientY, message: m });
-                }}
-                onImageClick={(url, name) => setLightboxImage({ url, name })}
-                onScrollToMessage={handleScrollToMessage}
-                onReactionClick={handleReaction}
-                onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
-                onEditTask={(task) => setEditTaskItem(task)}
+                {messages.map((msg) => (
+                  <MessageItem
+                    key={msg.id}
+                    message={msg}
+                    currentUser={currentUser}
+                    onOpenContextMenu={(coords, m) => {
+                      setContextMenu({ x: coords.clientX, y: coords.clientY, message: m });
+                    }}
+                    onImageClick={(url, name) => setLightboxImage({ url, name })}
+                    onScrollToMessage={handleScrollToMessage}
+                    onReactionClick={handleReaction}
+                    onRequestCompleteTask={(task) => setCompleteTaskItem(task)}
+                    onEditTask={(task) => setEditTaskItem(task)}
+                  />
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Bar */}
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                replyingTo={replyingTo}
+                onCancelReply={() => setReplyingTo(null)}
+                onTypingStart={handleTypingStart}
+                onTypingStop={handleTypingStop}
               />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+            </>
+          )}
 
-          {/* Input Bar */}
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            replyingTo={replyingTo}
-            onCancelReply={() => setReplyingTo(null)}
-            onTypingStart={handleTypingStart}
-            onTypingStop={handleTypingStop}
-          />
+          {/* VIEW 2: KANBAN BOARD */}
+          {currentView === 'kanban' && (
+            <TaskKanbanView
+              tasks={tasks}
+              members={activeGroup.members}
+              currentUser={currentUser}
+              onEditTask={(task) => setEditTaskItem(task)}
+              onCompleteTask={(task) => setCompleteTaskItem(task)}
+              onStatusChange={handleDirectStatusChange}
+              onJumpToMessage={handleJumpToMessage}
+            />
+          )}
+
+          {/* VIEW 3: PLAN EXCEL / TABLE VIEW */}
+          {currentView === 'table' && (
+            <TaskGridView
+              tasks={tasks}
+              members={activeGroup.members}
+              currentUser={currentUser}
+              onEditTask={(task) => setEditTaskItem(task)}
+              onCompleteTask={(task) => setCompleteTaskItem(task)}
+              onStatusChange={handleDirectStatusChange}
+              onJumpToMessage={handleJumpToMessage}
+            />
+          )}
         </main>
       ) : (
         <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f0f2f5] ${activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
@@ -391,7 +463,7 @@ export default function ChatPage() {
 
       {/* 3. Right Task Side Panel */}
       <TaskSidePanel
-        isOpen={isTaskPanelOpen}
+        isOpen={isTaskPanelOpen && currentView === 'chat'}
         onClose={() => setIsTaskPanelOpen(false)}
         tasks={tasks}
         onScrollToMessage={handleScrollToMessage}
@@ -410,7 +482,7 @@ export default function ChatPage() {
           onConvertToTask={(msg) => setCreateTaskMessage(msg)}
           onReply={(msg) => setReplyingTo(msg)}
           onReaction={handleReaction}
-          onDeleteMessage={handleDeleteMessage}
+          onDeleteMessage={(msg) => handleDeleteMessage(msg.id)}
         />
       )}
 

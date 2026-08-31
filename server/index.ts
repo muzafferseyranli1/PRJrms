@@ -856,12 +856,12 @@ app.prepare().then(() => {
         const updatedTask = await prisma.task.update({
           where: { id: data.taskId },
           data: {
-            title: data.title.trim(),
-            description: data.description ? data.description.trim() : null,
-            assignedToId: data.assignedToId,
-            priority: data.priority as TaskPriority,
-            status: data.status as TaskStatus,
-            dueDate: data.dueDate ? new Date(data.dueDate) : null,
+            title: data.title !== undefined ? data.title.trim() : currentTask.title,
+            description: data.description !== undefined ? (data.description ? data.description.trim() : null) : currentTask.description,
+            assignedToId: data.assignedToId || currentTask.assignedToId,
+            priority: (data.priority as TaskPriority) || currentTask.priority,
+            status: (data.status as TaskStatus) || currentTask.status,
+            dueDate: data.dueDate !== undefined ? (data.dueDate ? new Date(data.dueDate) : null) : currentTask.dueDate,
           },
           include: {
             assignedTo: {

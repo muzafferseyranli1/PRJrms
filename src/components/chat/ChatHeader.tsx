@@ -1,8 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckSquare, ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
+import {
+  MessageSquare,
+  LayoutGrid,
+  FileSpreadsheet,
+  CheckSquare,
+  ArrowLeft,
+  Trash2,
+  AlertTriangle,
+} from 'lucide-react';
 import { GroupItem, UserSession } from '@/lib/types';
+
+export type MainViewType = 'chat' | 'kanban' | 'table';
 
 interface Props {
   group: GroupItem;
@@ -11,6 +21,8 @@ interface Props {
   onToggleTaskPanel: () => void;
   typingUsers: string[];
   currentUser: UserSession;
+  currentView: MainViewType;
+  onChangeView: (view: MainViewType) => void;
   onBackToSidebar?: () => void;
   onDeleteGroup: (groupId: string) => void;
 }
@@ -22,6 +34,8 @@ export default function ChatHeader({
   onToggleTaskPanel,
   typingUsers,
   currentUser,
+  currentView,
+  onChangeView,
   onBackToSidebar,
   onDeleteGroup,
 }: Props) {
@@ -29,9 +43,9 @@ export default function ChatHeader({
 
   return (
     <>
-      <header className="h-14 sm:h-16 px-2 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef] select-none z-10">
-        {/* Group Info & Mobile Back Button */}
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+      <header className="h-14 sm:h-16 px-2 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef] select-none z-10 gap-2">
+        {/* Left: Group Info & Mobile Back Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
           {onBackToSidebar && (
             <button
               onClick={onBackToSidebar}
@@ -47,7 +61,7 @@ export default function ChatHeader({
             alt={group.name}
             className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-[#e9edef] bg-white object-cover flex-shrink-0"
           />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <h2 className="text-xs sm:text-sm font-semibold text-[#111b21] truncate">{group.name}</h2>
             <div className="text-[10px] sm:text-xs text-[#54656f] truncate">
               {typingUsers.length > 0 ? (
@@ -55,35 +69,85 @@ export default function ChatHeader({
                   {typingUsers.join(', ')} yazıyor...
                 </span>
               ) : (
-                <span>{group.members.length} üye ({group.members.map((m) => m.user.fullName.split(' ')[0]).join(', ')})</span>
+                <span>
+                  {group.members.length} üye ({group.members.map((m) => m.user.fullName.split(' ')[0]).join(', ')})
+                </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          {/* Toggle Task Side Panel Button */}
+        {/* Center: View Switcher (Sohbet | Kanban | Plan Tablosu) */}
+        <div className="flex items-center bg-[#e9edef]/80 p-1 rounded-2xl border border-[#e9edef] flex-shrink-0">
+          {/* 1. Sohbet */}
           <button
-            onClick={onToggleTaskPanel}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
-              isTaskPanelOpen
-                ? 'bg-[#008069] text-white shadow-md shadow-[#008069]/20'
-                : 'bg-white text-[#111b21] border border-[#e9edef] hover:border-[#008069]/50 shadow-xs'
+            onClick={() => onChangeView('chat')}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
+              currentView === 'chat'
+                ? 'bg-white text-[#111b21] shadow-xs'
+                : 'text-[#54656f] hover:text-[#111b21]'
             }`}
+            title="Sohbet ve Akış"
           >
-            <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span className="hidden xs:inline sm:inline">Görevler</span>
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline sm:inline">Sohbet</span>
+          </button>
+
+          {/* 2. Kanban Panosu */}
+          <button
+            onClick={() => onChangeView('kanban')}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
+              currentView === 'kanban'
+                ? 'bg-[#008069] text-white shadow-xs'
+                : 'text-[#54656f] hover:text-[#111b21]'
+            }`}
+            title="Kanban Panosu"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline sm:inline">Kanban</span>
             {taskCount > 0 && (
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
-                  isTaskPanelOpen ? 'bg-white text-[#008069]' : 'bg-[#008069] text-white'
+                className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                  currentView === 'kanban' ? 'bg-white text-[#008069]' : 'bg-white/80 text-[#54656f]'
                 }`}
               >
                 {taskCount}
               </span>
             )}
           </button>
+
+          {/* 3. Plan / Excel Tablosu */}
+          <button
+            onClick={() => onChangeView('table')}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
+              currentView === 'table'
+                ? 'bg-[#008069] text-white shadow-xs'
+                : 'text-[#54656f] hover:text-[#111b21]'
+            }`}
+            title="Plan & Excel Tablosu"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline sm:inline">Plan Tablosu</span>
+          </button>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          {/* Quick Drawer Button in Chat Mode */}
+          {currentView === 'chat' && (
+            <button
+              onClick={onToggleTaskPanel}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
+                isTaskPanelOpen
+                  ? 'bg-[#008069] text-white shadow-md shadow-[#008069]/20'
+                  : 'bg-white text-[#111b21] border border-[#e9edef] hover:border-[#008069]/50 shadow-xs'
+              }`}
+              title="Görev Çekmecesi"
+            >
+              <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden md:inline">Panel</span>
+            </button>
+          )}
 
           {/* Admin Group Delete Button */}
           {currentUser.role === 'ADMIN' && (
