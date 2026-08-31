@@ -50,13 +50,64 @@ export default function MessageInput({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+    if (e.target.files && e.target.files.length > 0) {
       setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
     }
+    // Reset input value so same file can be selected again
+    e.target.value = '';
   };
 
   const removeFile = (idx: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Upload helper — returns attachment list or []
+  const uploadFiles = async (files: File[]): Promise<any[]> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    if (files.length === 1) formData.append('file', files[0]);
+
+    const token = localStorage.getItem('prjrms_token');
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    const data = await res.json();
+
+    if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+      return data.files;
+    } else if (data.fileUrl) {
+      return [{ fileUrl: data.fileUrl, fileName: data.fileName, fileSize: data.fileSize, mimeType: data.mimeType }];
+    }
+    return [];
+  };
+
+  // 📷 Camera: capture → upload → send immediately (like WhatsApp)
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+
+    setUploading(true);
+    // Safety timeout — unlock button after 15s even if fetch hangs
+    const safetyTimer = setTimeout(() => setUploading(false), 15000);
+
+    try {
+      const attachments = await uploadFiles(files);
+      onSendMessage(undefined, attachments.length > 0 ? attachments : undefined, replyingTo?.id);
+      onCancelReply();
+      onTypingStop();
+    } catch (err) {
+      console.error('Camera upload error:', err);
+      // Fall back: add to selectedFiles so user can retry with send button
+      setSelectedFiles(files);
+    } finally {
+      clearTimeout(safetyTimer);
+      setUploading(false);
+    }
   };
 
   const handleSend = async () => {
@@ -66,38 +117,13 @@ export default function MessageInput({
 
     if (selectedFiles.length > 0) {
       setUploading(true);
+      const safetyTimer = setTimeout(() => setUploading(false), 15000);
       try {
-        const formData = new FormData();
-        selectedFiles.forEach((file) => formData.append('files', file));
-        if (selectedFiles.length === 1) {
-          formData.append('file', selectedFiles[0]);
-        }
-
-        const token = localStorage.getItem('prjrms_token');
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.files && Array.isArray(data.files) && data.files.length > 0) {
-            attachments = data.files;
-          } else if (data.fileUrl) {
-            attachments = [
-              {
-                fileUrl: data.fileUrl,
-                fileName: data.fileName,
-                fileSize: data.fileSize,
-                mimeType: data.mimeType,
-              },
-            ];
-          }
-        }
+        attachments = await uploadFiles(selectedFiles);
       } catch (err) {
         console.error('File upload error:', err);
       } finally {
+        clearTimeout(safetyTimer);
         setUploading(false);
       }
     }
@@ -210,7 +236,7 @@ export default function MessageInput({
           ref={cameraInputRef}
           accept="image/*"
           capture="environment"
-          onChange={handleFileSelect}
+          onChange={handleCameraCapture}
           className="hidden"
         />
 
