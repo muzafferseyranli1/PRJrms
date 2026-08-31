@@ -13,6 +13,9 @@ import { UserRole, GroupRole, MessageType, TaskStatus, TaskPriority } from '@pri
 
 dotenv.config();
 
+// Ana yönetici hesabı — sabit, silinemez, değiştirilemez
+const MASTER_ADMIN_EMAIL = 'muzaffer.seyranli@gmail.com';
+
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev, dir: path.resolve(__dirname, '..') });
 const handle = app.getRequestHandler();

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { X, UserPlus, Shield, User, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { UserRole } from '@/lib/types';
+
+type UserRole = 'ADMIN' | 'MEMBER';
 
 interface Props {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export default function AdminCreateUserModal({ isOpen, onClose, onUserCreated }:
         ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`
         : undefined;
 
-      const res = await fetch('/api/auth/register-user', {
+      const res = await fetch('/api/auth/create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

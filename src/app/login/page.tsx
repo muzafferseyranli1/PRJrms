@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, MessageSquare, Lock, Mail, ArrowRight, AlertCircle, CheckCircle2, User } from 'lucide-react';
+import { Shield, MessageSquare, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,11 +41,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const quickLogin = (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('123456');
   };
 
   return (
@@ -89,7 +84,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ornek@prjrms.local"
+                  placeholder="email@adresiniz.com"
                   required
                   className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 bg-[#f0f2f5] border border-[#e9edef] rounded-xl text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:border-[#008069] focus:bg-white transition"
                 />
@@ -124,80 +119,6 @@ export default function LoginPage() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Demo Login Section */}
-          <div className="pt-3 sm:pt-4 border-t border-[#e9edef] space-y-2.5">
-            <div className="flex items-center justify-between text-[10px] sm:text-xs text-[#54656f]">
-              <span className="font-semibold uppercase tracking-wider">Hızlı Ekip Girişi</span>
-              <span className="text-[#8696a0]">Şifre: 123456</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-              <button
-                type="button"
-                onClick={() => quickLogin('admin@prjrms.local')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
-              >
-                <img
-                  src="https://api.dicebear.com/7.x/bottts/svg?seed=admin"
-                  alt="Admin"
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Admin</p>
-                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Yönetici</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin('ahmet@prjrms.local')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
-              >
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=ahmet"
-                  alt="Ahmet"
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Ahmet Yılmaz</p>
-                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin('mehmet@prjrms.local')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
-              >
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=mehmet"
-                  alt="Mehmet"
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Mehmet Demir</p>
-                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin('ayse@prjrms.local')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#f0f2f5] hover:bg-[#e9edef] border border-[#e9edef] text-left transition flex items-center gap-2"
-              >
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=ayse"
-                  alt="Ayşe"
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white flex-shrink-0"
-                />
-                <div className="min-w-0">
-                  <p className="text-[11px] sm:text-xs font-semibold text-[#111b21] truncate">Ayşe Kaya</p>
-                  <p className="text-[9px] sm:text-[10px] text-[#54656f] truncate">Geliştirici</p>
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}
