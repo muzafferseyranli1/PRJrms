@@ -166,21 +166,19 @@ export default function ChatHeader({
             {isMuted ? <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
 
-          {/* Quick Drawer Button in Chat Mode */}
-          {currentView === 'chat' && (
-            <button
-              onClick={onToggleTaskPanel}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
-                isTaskPanelOpen
-                  ? 'bg-[#008069] text-white shadow-md shadow-[#008069]/20'
-                  : 'bg-white text-[#111b21] border border-[#e9edef] hover:border-[#008069]/50 shadow-xs'
-              }`}
-              title="Görev Çekmecesi"
-            >
-              <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden md:inline">Panel</span>
-            </button>
-          )}
+          {/* Görev Listesi Drawer Button - always visible */}
+          <button
+            onClick={onToggleTaskPanel}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition ${
+              isTaskPanelOpen
+                ? 'bg-[#008069] text-white shadow-md shadow-[#008069]/20'
+                : 'bg-white text-[#111b21] border border-[#e9edef] hover:border-[#008069]/50 shadow-xs'
+            }`}
+            title="Görev Listesi"
+          >
+            <CheckSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden md:inline">Görev Listesi</span>
+          </button>
 
           {/* Admin Group Delete Button */}
           {currentUser.role === 'ADMIN' && (
