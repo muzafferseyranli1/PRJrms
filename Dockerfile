@@ -18,6 +18,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://postgres:RMSv3_Local_Password_2026!@host.docker.internal:5432/prjrms_db?schema=public"
+ENV JWT_SECRET="prjrms_super_secret_jwt_key_2026_x1892_production"
+ENV PORT=3050
+
 RUN mkdir -p /app/public/uploads
 RUN npx prisma generate
 RUN npm run build
@@ -26,6 +30,9 @@ RUN npm run build
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3050
+ENV DATABASE_URL="postgresql://postgres:RMSv3_Local_Password_2026!@host.docker.internal:5432/prjrms_db?schema=public"
+ENV JWT_SECRET="prjrms_super_secret_jwt_key_2026_x1892_production"
+ENV NEXT_PUBLIC_APP_URL="http://188.132.198.144:3050"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
