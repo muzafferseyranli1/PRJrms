@@ -68,7 +68,7 @@ export default function TaskSidePanel({
         className="fixed inset-0 bg-black/40 backdrop-blur-xs z-30 md:hidden animate-in fade-in"
       />
 
-      <aside className="fixed inset-y-0 right-0 w-full sm:w-96 md:w-80 lg:w-96 h-full flex flex-col bg-white border-l border-[#e9edef] select-none z-40 shadow-2xl animate-in slide-in-from-right duration-200">
+      <aside className="fixed inset-y-0 right-0 w-full sm:w-[268px] md:w-[224px] lg:w-[268px] h-full flex flex-col bg-white border-l border-[#e9edef] select-none z-40 shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Panel Header */}
         <div className="h-14 sm:h-16 px-3 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef]">
           <div className="flex items-center gap-2">
