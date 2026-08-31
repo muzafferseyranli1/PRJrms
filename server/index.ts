@@ -294,6 +294,86 @@ app.prepare().then(() => {
     }
   });
 
+  // 5.1 Users: List All Active Team Members
+  server.get('/api/users', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const users = await prisma.user.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          avatarUrl: true,
+          role: true,
+        },
+        orderBy: { fullName: 'asc' },
+      });
+      return res.json({ users });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Kullanıcılar listelenemedi' });
+    }
+  });
+
+  // 5.2 Groups: Create New Group
+  server.post('/api/groups', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const currentUser = (req as any).user;
+      const { name, description, avatarUrl, memberIds } = req.body;
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Grup adı zorunludur' });
+      }
+
+      const newGroup = await prisma.group.create({
+        data: {
+          name: name.trim(),
+          description: description ? description.trim() : null,
+          avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(name.trim())}`,
+          members: {
+            create: [
+              { userId: currentUser.id, role: GroupRole.ADMIN },
+              ...(Array.isArray(memberIds)
+                ? memberIds
+                    .filter((id: string) => id !== currentUser.id)
+                    .map((id: string) => ({ userId: id, role: GroupRole.MEMBER }))
+                : []),
+            ],
+          },
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  avatarUrl: true,
+                  role: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // İlk karşılama sistem mesajı
+      await prisma.message.create({
+        data: {
+          groupId: newGroup.id,
+          senderId: currentUser.id,
+          content: `🎉 "${newGroup.name}" grubu oluşturuldu.`,
+          type: MessageType.SYSTEM,
+        },
+      });
+
+      return res.status(201).json({ group: newGroup });
+    } catch (err: any) {
+      console.error('Create group error:', err);
+      return res.status(500).json({ error: 'Grup oluşturulurken hata oluştu' });
+    }
+  });
+
   // 6. Messages: List Group Messages
   server.get('/api/groups/:groupId/messages', requireAuth, async (req: Request, res: Response) => {
     try {

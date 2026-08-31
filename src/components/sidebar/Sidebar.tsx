@@ -5,6 +5,7 @@ import { Search, Plus, UserPlus, Settings, LogOut, MessageSquare, Shield, Users 
 import { GroupItem, UserSession } from '@/lib/types';
 import AdminCreateUserModal from './AdminCreateUserModal';
 import UserProfileModal from './UserProfileModal';
+import CreateGroupModal from './CreateGroupModal';
 
 interface Props {
   groups: GroupItem[];
@@ -30,6 +31,7 @@ export default function Sidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
 
   const filteredGroups = groups.filter((g) =>
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -63,6 +65,15 @@ export default function Sidebar({
         </div>
 
         <div className="flex items-center gap-1">
+          {/* 🌟 Yeni Grup Oluştur Butonu 🌟 */}
+          <button
+            onClick={() => setShowCreateGroupModal(true)}
+            title="Yeni Sohbet Grubu Oluştur"
+            className="p-2 rounded-xl text-[#8696a0] hover:text-[#00a884] hover:bg-[#111b21] transition"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+
           {currentUser.role === 'ADMIN' && (
             <button
               onClick={() => setShowAdminModal(true)}
@@ -109,6 +120,12 @@ export default function Sidebar({
           <span className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5 text-[#00a884]" /> Sohbet Grupları ({filteredGroups.length})
           </span>
+          <button
+            onClick={() => setShowCreateGroupModal(true)}
+            className="text-[10px] text-[#00a884] hover:underline font-semibold flex items-center gap-0.5"
+          >
+            <Plus className="w-3 h-3" /> Yeni Grup
+          </button>
         </div>
 
         {filteredGroups.length === 0 ? (
@@ -168,6 +185,15 @@ export default function Sidebar({
       </div>
 
       {/* Modals */}
+      <CreateGroupModal
+        isOpen={showCreateGroupModal}
+        onClose={() => setShowCreateGroupModal(false)}
+        onGroupCreated={(newGroupId) => {
+          onUserCreated(); // refresh groups
+          onSelectGroup(newGroupId);
+        }}
+        currentUser={currentUser}
+      />
       <AdminCreateUserModal
         isOpen={showAdminModal}
         onClose={() => setShowAdminModal(false)}
