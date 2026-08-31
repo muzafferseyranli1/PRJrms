@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Send, Paperclip, Smile, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Send, Paperclip, Camera, Smile, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { MessageItem } from '@/lib/types';
 
 interface Props {
@@ -27,6 +27,7 @@ export default function MessageInput({
   const [uploading, setUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -159,15 +160,18 @@ export default function MessageInput({
       )}
 
       {/* Input Row */}
-      <div className="flex items-end gap-1.5 sm:gap-2">
+      <div className="flex items-end gap-1 sm:gap-1.5">
+        {/* Emoji Button */}
         <button
           type="button"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
           className="p-2 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-white transition flex-shrink-0"
+          title="Emoji"
         >
           <Smile className="w-5 h-5" />
         </button>
 
+        {/* Regular File/Gallery Input */}
         <input
           type="file"
           ref={fileInputRef}
@@ -176,12 +180,34 @@ export default function MessageInput({
           className="hidden"
         />
 
+        {/* File Attach Button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="p-2 rounded-xl text-[#54656f] hover:text-[#111b21] hover:bg-white transition flex-shrink-0"
+          title="Dosya veya Galeri Ekle"
         >
           <Paperclip className="w-5 h-5" />
+        </button>
+
+        {/* 📷 Direct Camera Capture Input (Mobile Native Camera Support) */}
+        <input
+          type="file"
+          ref={cameraInputRef}
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* 📷 Direct Camera Capture Button */}
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="p-2 rounded-xl text-[#54656f] hover:text-[#008069] hover:bg-white transition flex-shrink-0"
+          title="Fotoğraf Çek (Kamera)"
+        >
+          <Camera className="w-5 h-5" />
         </button>
 
         {/* Text Area */}

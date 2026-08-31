@@ -22,6 +22,11 @@ import {
   TaskStatus,
 } from '@/lib/types';
 import { getSocket } from '@/lib/socket';
+import {
+  playNotificationSound,
+  showDesktopNotification,
+  flashTabTitle,
+} from '@/lib/notifications';
 import { MessageSquare, Shield, CheckSquare } from 'lucide-react';
 
 export default function ChatPage() {
@@ -147,6 +152,28 @@ export default function ChatPage() {
 
     // Socket Event Handlers
     const handleNewMessage = (newMsg: MessageItemType) => {
+      // 🔔 Sesli ve Görsel Bildirim (Gelen mesaj başkasına aitse)
+      if (newMsg.senderId !== currentUser.id) {
+        playNotificationSound('message');
+        const senderName = newMsg.sender?.fullName || 'Biri';
+        const preview =
+          newMsg.content ||
+          (newMsg.attachments && newMsg.attachments.length > 0
+            ? '📷 Fotoğraf / Dosya eki'
+            : 'Yeni mesaj gönderildi');
+
+        flashTabTitle(`(1) 💬 ${senderName}: ${preview}`);
+        showDesktopNotification(
+          senderName,
+          preview,
+          newMsg.sender?.avatarUrl || undefined,
+          () => {
+            setActiveGroupId(newMsg.groupId);
+            setActiveMobileView('chat');
+          }
+        );
+      }
+
       if (newMsg.groupId === activeGroupId) {
         setMessages((prev) => [...prev, newMsg]);
         setTimeout(scrollToBottom, 50);
@@ -178,12 +205,20 @@ export default function ChatPage() {
     };
 
     const handleTaskCreated = (newTask: TaskItem) => {
+      if (newTask.createdById !== currentUser.id) {
+        playNotificationSound('task');
+        showDesktopNotification(
+          '⚡ Yeni Görev Tanımlandı',
+          `"${newTask.title}" - Sorumlu: ${newTask.assignedTo?.fullName || 'Ekip Üyesi'}`
+        );
+      }
       if (newTask.groupId === activeGroupId) {
         setTasks((prev) => [newTask, ...prev.filter((t) => t.id !== newTask.id)]);
       }
     };
 
     const handleTaskUpdated = (updatedTask: TaskItem) => {
+      playNotificationSound('task');
       if (updatedTask.groupId === activeGroupId) {
         setTasks((prev) =>
           prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))

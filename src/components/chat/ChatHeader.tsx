@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MessageSquare,
   LayoutGrid,
@@ -9,8 +9,11 @@ import {
   ArrowLeft,
   Trash2,
   AlertTriangle,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 import { GroupItem, UserSession } from '@/lib/types';
+import { requestNotificationPermission, playNotificationSound } from '@/lib/notifications';
 
 export type MainViewType = 'chat' | 'kanban' | 'table';
 
@@ -40,10 +43,27 @@ export default function ChatHeader({
   onDeleteGroup,
 }: Props) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsMuted(localStorage.getItem('prjrms_sound_muted') === 'true');
+    }
+  }, []);
+
+  const handleToggleNotifications = async () => {
+    await requestNotificationPermission();
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    localStorage.setItem('prjrms_sound_muted', newMuted ? 'true' : 'false');
+    if (!newMuted) {
+      playNotificationSound('message');
+    }
+  };
 
   return (
     <>
-      <header className="h-14 sm:h-16 px-2 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef] select-none z-10 gap-2">
+      <header className="h-14 sm:h-16 px-2 sm:px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#e9edef] select-none z-10 gap-1.5 sm:gap-2">
         {/* Left: Group Info & Mobile Back Button */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
           {onBackToSidebar && (
@@ -78,7 +98,7 @@ export default function ChatHeader({
         </div>
 
         {/* Center: View Switcher (Sohbet | Kanban | Plan Tablosu) */}
-        <div className="flex items-center bg-[#e9edef]/80 p-1 rounded-2xl border border-[#e9edef] flex-shrink-0">
+        <div className="flex items-center bg-[#e9edef]/80 p-0.5 sm:p-1 rounded-2xl border border-[#e9edef] flex-shrink-0">
           {/* 1. Sohbet */}
           <button
             onClick={() => onChangeView('chat')}
@@ -131,8 +151,21 @@ export default function ChatHeader({
           </button>
         </div>
 
-        {/* Right: Actions */}
+        {/* Right: Notification Bell & Actions */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          {/* Notification / Sound Toggle */}
+          <button
+            onClick={handleToggleNotifications}
+            title={isMuted ? 'Sesli Bildirimleri Aç' : 'Sesli Bildirimleri Kapat'}
+            className={`p-1.5 sm:p-2 rounded-xl transition ${
+              isMuted
+                ? 'text-[#8696a0] hover:bg-white'
+                : 'text-[#008069] hover:bg-white bg-[#008069]/10'
+            }`}
+          >
+            {isMuted ? <BellOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+          </button>
+
           {/* Quick Drawer Button in Chat Mode */}
           {currentView === 'chat' && (
             <button
