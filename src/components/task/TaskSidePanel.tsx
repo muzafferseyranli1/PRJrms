@@ -38,8 +38,10 @@ export default function TaskSidePanel({
 
   const filteredTasks = tasks.filter((t) => {
     const matchesFilter = filterStatus === 'ALL' || t.status === filterStatus;
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch =
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.assignees && t.assignees.some((a) => a.user?.fullName.toLowerCase().includes(searchQuery.toLowerCase())));
     return matchesFilter && matchesSearch;
   });
 
@@ -223,13 +225,33 @@ export default function TaskSidePanel({
                 {/* Bottom Row: Assignee & Quick Status Dropdown */}
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#e9edef]">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <img
-                      src={task.assignedTo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + task.assignedToId}
-                      alt={task.assignedTo?.fullName || 'Assignee'}
-                      className="w-5 h-5 rounded-full bg-white flex-shrink-0"
-                    />
-                    <span className="text-[11px] font-medium text-[#111b21] truncate max-w-[80px] sm:max-w-[100px]">
-                      {task.assignedTo?.fullName || 'Atanmamış'}
+                    {task.assignees && task.assignees.length > 0 ? (
+                      <div className="flex items-center -space-x-1 overflow-hidden flex-shrink-0">
+                        {task.assignees.slice(0, 3).map((a, i) => (
+                          <img
+                            key={i}
+                            src={a.user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${a.userId}`}
+                            alt={a.user?.fullName || 'Üye'}
+                            title={a.user?.fullName}
+                            className="w-4 h-4 rounded-full bg-white ring-1 ring-[#e9edef] flex-shrink-0 object-cover"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <img
+                        src={task.assignedTo?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assignedToId || 'default'}`}
+                        alt={task.assignedTo?.fullName || 'Assignee'}
+                        className="w-4 h-4 rounded-full bg-white flex-shrink-0 object-cover"
+                      />
+                    )}
+                    <span className="text-[10px] font-medium text-[#111b21] truncate max-w-[80px]" title={
+                      task.assignees && task.assignees.length > 0
+                        ? task.assignees.map((a) => a.user?.fullName).filter(Boolean).join(', ')
+                        : task.assignedTo?.fullName || 'Atanmamış'
+                    }>
+                      {task.assignees && task.assignees.length > 0
+                        ? task.assignees.map((a) => a.user?.fullName?.split(' ')[0]).filter(Boolean).join(', ')
+                        : task.assignedTo?.fullName?.split(' ')[0] || 'Atanmamış'}
                     </span>
                   </div>
 

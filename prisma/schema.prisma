@@ -36,6 +36,7 @@ model User {
   // Görev İlişkileri
   assignedTasks    Task[]          @relation("AssignedTo")
   createdTasks     Task[]          @relation("CreatedTasks")
+  taskAssignments  TaskAssignee[]
 
   @@map("users")
 }
@@ -177,18 +178,33 @@ model Task {
   dueDate     DateTime?
 
   createdById  String
-  assignedToId String
+  assignedToId String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   // İlişkiler
-  group      Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  message    Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  createdBy  User    @relation("CreatedTasks", fields: [createdById], references: [id])
-  assignedTo User    @relation("AssignedTo", fields: [assignedToId], references: [id])
+  group      Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  message    Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdBy  User           @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignedTo User?          @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignees  TaskAssignee[]
 
   @@index([groupId, status])
   @@index([assignedToId, status])
   @@map("tasks")
+}
+
+// Çoklu Görev Sorumluları (Many-to-Many)
+model TaskAssignee {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@map("task_assignees")
 }

@@ -20,7 +20,7 @@ export default function EditTaskModal({
 }: Props) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [assignedToId, setAssignedToId] = useState('');
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
   const [status, setStatus] = useState<TaskStatus>('PENDING');
   const [dueDate, setDueDate] = useState('');
@@ -32,23 +32,37 @@ export default function EditTaskModal({
     if (task) {
       setTitle(task.title);
       setDescription(task.description || '');
-      setAssignedToId(task.assignedToId);
+      const initialIds =
+        task.assignees && task.assignees.length > 0
+          ? task.assignees.map((a) => a.userId)
+          : task.assignedToId
+          ? [task.assignedToId]
+          : members[0]?.userId
+          ? [members[0].userId]
+          : [];
+      setSelectedAssigneeIds(initialIds);
       setPriority(task.priority);
       setStatus(task.status);
       setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
       setReopenNote('');
     }
-  }, [task]);
+  }, [task, members]);
 
   if (!isOpen || !task) return null;
 
   const wasClosed = task.status === 'COMPLETED' || task.status === 'CANCELLED';
   const isReopening = wasClosed && (status === 'PENDING' || status === 'IN_PROGRESS');
 
+  const toggleAssignee = (userId: string) => {
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(userId) ? (prev.length > 1 ? prev.filter((id) => id !== userId) : prev) : [...prev, userId]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !assignedToId) {
-      setError('Lütfen görev başlığı ve sorumlu kişiyi seçin.');
+    if (!title.trim() || selectedAssigneeIds.length === 0) {
+      setError('Lütfen görev başlığı ve en az bir sorumlu kişi seçin.');
       return;
     }
 
@@ -60,7 +74,8 @@ export default function EditTaskModal({
       taskId: task.id,
       title: title.trim(),
       description: description.trim() || undefined,
-      assignedToId,
+      assignedToId: selectedAssigneeIds[0],
+      assigneeIds: selectedAssigneeIds,
       priority,
       status,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
@@ -120,24 +135,51 @@ export default function EditTaskModal({
             />
           </div>
 
+          {/* Sorumlular (Çoklu Seçim) */}
+          <div>
+            <label className="block text-xs font-medium text-[#54656f] mb-1.5">
+              Görev Sorumluları (Birden Fazla Seçilebilir) <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-[#f0f2f5] rounded-2xl border border-[#e9edef]">
+              {members.map((m) => {
+                const isSelected = selectedAssigneeIds.includes(m.userId);
+                return (
+                  <button
+                    key={m.userId}
+                    type="button"
+                    onClick={() => toggleAssignee(m.userId)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-medium transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#008069] text-white shadow-xs'
+                        : 'bg-white text-[#54656f] border border-[#e9edef] hover:border-[#008069]/40'
+                    }`}
+                  >
+                    <img
+                      src={m.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.userId}`}
+                      alt={m.user.fullName}
+                      className="w-3.5 h-3.5 rounded-full object-cover"
+                    />
+                    <span>{m.user.fullName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Assignee */}
+            {/* Status */}
             <div>
-              <label className="block text-xs font-medium text-[#54656f] mb-1">Atanan Kişi</label>
-              <div className="relative">
-                <select
-                  value={assignedToId}
-                  onChange={(e) => setAssignedToId(e.target.value)}
-                  className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-2 text-xs text-[#111b21] focus:outline-none transition appearance-none"
-                >
-                  {members.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      {m.user.fullName} {m.user.role === 'ADMIN' ? '(Yönetici)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8696a0] pointer-events-none" />
-              </div>
+              <label className="block text-xs font-medium text-[#54656f] mb-1">Görev Statüsü</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                className="w-full bg-[#f0f2f5] border border-transparent focus:border-[#008069] focus:bg-white rounded-xl px-3 py-2 text-xs text-[#111b21] focus:outline-none transition"
+              >
+                <option value="PENDING">Bekliyor (Açık)</option>
+                <option value="IN_PROGRESS">Devam Ediyor (Açık)</option>
+                <option value="COMPLETED">Tamamlandı (Kapalı)</option>
+                <option value="CANCELLED">İptal Edildi (Kapalı)</option>
+              </select>
             </div>
 
             {/* Status */}

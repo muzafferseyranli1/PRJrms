@@ -34,6 +34,18 @@ export interface MessageReactionItem {
   };
 }
 
+export interface TaskAssigneeItem {
+  id?: string;
+  taskId?: string;
+  userId: string;
+  user: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string | null;
+    email?: string;
+  };
+}
+
 export interface TaskItem {
   id: string;
   groupId: string;
@@ -44,7 +56,7 @@ export interface TaskItem {
   priority: TaskPriority;
   dueDate?: string | null;
   createdById: string;
-  assignedToId: string;
+  assignedToId?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy?: {
@@ -56,7 +68,8 @@ export interface TaskItem {
     id: string;
     fullName: string;
     avatarUrl?: string | null;
-  };
+  } | null;
+  assignees?: TaskAssigneeItem[];
 }
 
 export interface MessageItem {

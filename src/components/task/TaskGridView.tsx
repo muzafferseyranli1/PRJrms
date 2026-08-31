@@ -69,10 +69,13 @@ export default function TaskGridView({
       const matchesSearch =
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase()));
+        (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (t.assignees && t.assignees.some((a) => a.user?.fullName.toLowerCase().includes(searchQuery.toLowerCase())));
 
       const matchesAssignee =
-        selectedAssignee === 'ALL' || t.assignedToId === selectedAssignee;
+        selectedAssignee === 'ALL' ||
+        t.assignedToId === selectedAssignee ||
+        (t.assignees && t.assignees.some((a) => a.userId === selectedAssignee));
 
       const matchesStatus =
         selectedStatus === 'ALL' || t.status === selectedStatus;
@@ -161,17 +164,24 @@ export default function TaskGridView({
       'Olusturulma Tarihi',
     ];
 
-    const rows = filteredTasks.map((t, idx) => [
-      idx + 1,
-      `"${(t.title || '').replace(/"/g, '""')}"`,
-      `"${(t.description || '').replace(/"/g, '""')}"`,
-      `"${t.assignedTo?.fullName || 'Atanmamış'}"`,
-      t.priority,
-      t.status,
-      t.dueDate ? new Date(t.dueDate).toLocaleDateString('tr-TR') : '',
-      `"${t.createdBy?.fullName || ''}"`,
-      new Date(t.createdAt).toLocaleDateString('tr-TR'),
-    ]);
+    const rows = filteredTasks.map((t, idx) => {
+      const assigneesStr =
+        t.assignees && t.assignees.length > 0
+          ? t.assignees.map((a) => a.user?.fullName).filter(Boolean).join(', ')
+          : t.assignedTo?.fullName || 'Atanmamış';
+
+      return [
+        idx + 1,
+        `"${(t.title || '').replace(/"/g, '""')}"`,
+        `"${(t.description || '').replace(/"/g, '""')}"`,
+        `"${assigneesStr.replace(/"/g, '""')}"`,
+        t.priority,
+        t.status,
+        t.dueDate ? new Date(t.dueDate).toLocaleDateString('tr-TR') : '',
+        `"${t.createdBy?.fullName || ''}"`,
+        new Date(t.createdAt).toLocaleDateString('tr-TR'),
+      ];
+    });
 
     const csvContent =
       'data:text/csv;charset=utf-8,\uFEFF' +
@@ -368,16 +378,39 @@ export default function TaskGridView({
                       {/* Assignee */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1.5">
-                          <img
-                            src={
-                              task.assignedTo?.avatarUrl ||
-                              `https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assignedToId}`
-                            }
-                            alt={task.assignedTo?.fullName || 'Üye'}
-                            className="w-5 h-5 rounded-full bg-[#f0f2f5] flex-shrink-0"
-                          />
-                          <span className="font-medium truncate">
-                            {task.assignedTo?.fullName || 'Atanmamış'}
+                          {task.assignees && task.assignees.length > 0 ? (
+                            <div className="flex items-center -space-x-1.5 overflow-hidden flex-shrink-0">
+                              {task.assignees.slice(0, 3).map((a, i) => (
+                                <img
+                                  key={i}
+                                  src={
+                                    a.user?.avatarUrl ||
+                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${a.userId}`
+                                  }
+                                  alt={a.user?.fullName || 'Üye'}
+                                  title={a.user?.fullName}
+                                  className="w-5 h-5 rounded-full bg-[#f0f2f5] ring-1 ring-white flex-shrink-0 object-cover"
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <img
+                              src={
+                                task.assignedTo?.avatarUrl ||
+                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assignedToId || 'default'}`
+                              }
+                              alt={task.assignedTo?.fullName || 'Üye'}
+                              className="w-5 h-5 rounded-full bg-[#f0f2f5] flex-shrink-0 object-cover"
+                            />
+                          )}
+                          <span className="font-medium truncate max-w-[200px]" title={
+                            task.assignees && task.assignees.length > 0
+                              ? task.assignees.map((a) => a.user?.fullName).filter(Boolean).join(', ')
+                              : task.assignedTo?.fullName || 'Atanmamış'
+                          }>
+                            {task.assignees && task.assignees.length > 0
+                              ? task.assignees.map((a) => a.user?.fullName).filter(Boolean).join(', ')
+                              : task.assignedTo?.fullName || 'Atanmamış'}
                           </span>
                         </div>
                       </td>

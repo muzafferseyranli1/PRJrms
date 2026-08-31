@@ -493,6 +493,18 @@ app.prepare().then(() => {
                   avatarUrl: true,
                 },
               },
+              assignees: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      avatarUrl: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -526,6 +538,18 @@ app.prepare().then(() => {
               id: true,
               fullName: true,
               avatarUrl: true,
+            },
+          },
+          assignees: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  avatarUrl: true,
+                  email: true,
+                },
+              },
             },
           },
         },
@@ -768,12 +792,13 @@ app.prepare().then(() => {
       messageId: string;
       title: string;
       description?: string;
-      assignedToId: string;
+      assignedToId?: string;
+      assigneeIds?: string[];
       dueDate?: string;
       priority?: TaskPriority;
     }) => {
       try {
-        const { groupId, messageId, title, description, assignedToId, dueDate, priority = 'MEDIUM' } = taskData;
+        const { groupId, messageId, title, description, assignedToId, assigneeIds = [], dueDate, priority = 'MEDIUM' } = taskData;
 
         // Check if task already exists for this message
         const existingTask = await prisma.task.findUnique({
@@ -784,17 +809,27 @@ app.prepare().then(() => {
           return socket.emit('error_message', { message: 'Bu mesaja ait zaten bir görev tanımlı' });
         }
 
+        // Determine all unique assignee IDs
+        const finalAssigneeIds = Array.from(
+          new Set([...(assigneeIds || []), ...(assignedToId ? [assignedToId] : [])])
+        ).filter(Boolean);
+
+        const primaryAssigneeId = finalAssigneeIds[0] || assignedToId || null;
+
         const task = await prisma.task.create({
           data: {
             groupId,
             messageId,
             title: title.trim(),
             description: description ? description.trim() : null,
-            assignedToId,
+            assignedToId: primaryAssigneeId,
             createdById: user.id,
             status: TaskStatus.PENDING,
             priority: priority as TaskPriority,
             dueDate: dueDate ? new Date(dueDate) : null,
+            assignees: {
+              create: finalAssigneeIds.map((uid) => ({ userId: uid })),
+            },
           },
           include: {
             assignedTo: {
@@ -809,6 +844,18 @@ app.prepare().then(() => {
                 id: true,
                 fullName: true,
                 avatarUrl: true,
+              },
+            },
+            assignees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true,
+                    email: true,
+                  },
+                },
               },
             },
           },
@@ -874,7 +921,8 @@ app.prepare().then(() => {
       taskId: string;
       title: string;
       description?: string;
-      assignedToId: string;
+      assignedToId?: string;
+      assigneeIds?: string[];
       dueDate?: string;
       priority: TaskPriority;
       status: TaskStatus;
@@ -883,7 +931,7 @@ app.prepare().then(() => {
       try {
         const currentTask = await prisma.task.findUnique({
           where: { id: data.taskId },
-          include: { assignedTo: true },
+          include: { assignedTo: true, assignees: true },
         });
 
         if (!currentTask) return;
@@ -891,12 +939,31 @@ app.prepare().then(() => {
         const wasClosed = currentTask.status === 'COMPLETED' || currentTask.status === 'CANCELLED';
         const isReopened = wasClosed && (data.status === 'PENDING' || data.status === 'IN_PROGRESS');
 
+        // Sync assignees if provided
+        if (data.assigneeIds && Array.isArray(data.assigneeIds)) {
+          const finalAssigneeIds = Array.from(
+            new Set([...data.assigneeIds, ...(data.assignedToId ? [data.assignedToId] : [])])
+          ).filter(Boolean);
+
+          await prisma.taskAssignee.deleteMany({ where: { taskId: data.taskId } });
+          if (finalAssigneeIds.length > 0) {
+            await prisma.taskAssignee.createMany({
+              data: finalAssigneeIds.map((uid) => ({ taskId: data.taskId, userId: uid })),
+              skipDuplicates: true,
+            });
+          }
+        }
+
+        const primaryAssigneeId = data.assignedToId !== undefined
+          ? data.assignedToId
+          : (data.assigneeIds && data.assigneeIds[0]) || currentTask.assignedToId;
+
         const updatedTask = await prisma.task.update({
           where: { id: data.taskId },
           data: {
             title: data.title !== undefined ? data.title.trim() : currentTask.title,
             description: data.description !== undefined ? (data.description ? data.description.trim() : null) : currentTask.description,
-            assignedToId: data.assignedToId || currentTask.assignedToId,
+            assignedToId: primaryAssigneeId,
             priority: (data.priority as TaskPriority) || currentTask.priority,
             status: (data.status as TaskStatus) || currentTask.status,
             dueDate: data.dueDate !== undefined ? (data.dueDate ? new Date(data.dueDate) : null) : currentTask.dueDate,
@@ -907,6 +974,18 @@ app.prepare().then(() => {
             },
             createdBy: {
               select: { id: true, fullName: true, avatarUrl: true },
+            },
+            assignees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true,
+                    email: true,
+                  },
+                },
+              },
             },
           },
         });
@@ -971,6 +1050,18 @@ app.prepare().then(() => {
             },
             createdBy: {
               select: { id: true, fullName: true, avatarUrl: true },
+            },
+            assignees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarUrl: true,
+                    email: true,
+                  },
+                },
+              },
             },
           },
         });

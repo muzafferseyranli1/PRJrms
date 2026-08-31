@@ -98,11 +98,14 @@ export default function TaskKanbanView({
       const matchesSearch =
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase()));
+        (t.assignedTo?.fullName && t.assignedTo.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (t.assignees && t.assignees.some((a) => a.user?.fullName.toLowerCase().includes(searchQuery.toLowerCase())));
 
       // Assignee filter
       const matchesAssignee =
-        selectedAssignee === 'ALL' || t.assignedToId === selectedAssignee;
+        selectedAssignee === 'ALL' ||
+        t.assignedToId === selectedAssignee ||
+        (t.assignees && t.assignees.some((a) => a.userId === selectedAssignee));
 
       // Priority filter
       const matchesPriority =
@@ -314,17 +317,36 @@ export default function TaskKanbanView({
                           {/* Assignee & Due Date */}
                           <div className="pt-2 border-t border-[#f0f2f5] flex items-center justify-between text-[10px] text-[#54656f]">
                             {/* Assignee */}
-                            <div className="flex items-center gap-1.5 min-w-0 max-w-[55%]">
-                              <img
-                                src={
-                                  task.assignedTo?.avatarUrl ||
-                                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assignedToId}`
-                                }
-                                alt={task.assignedTo?.fullName || 'Üye'}
-                                className="w-4 h-4 rounded-full bg-[#f0f2f5] flex-shrink-0"
-                              />
+                            <div className="flex items-center gap-1 min-w-0 max-w-[60%]">
+                              {task.assignees && task.assignees.length > 0 ? (
+                                <div className="flex items-center -space-x-1.5 overflow-hidden flex-shrink-0">
+                                  {task.assignees.slice(0, 3).map((a, i) => (
+                                    <img
+                                      key={i}
+                                      src={
+                                        a.user?.avatarUrl ||
+                                        `https://api.dicebear.com/7.x/avataaars/svg?seed=${a.userId}`
+                                      }
+                                      alt={a.user?.fullName || 'Üye'}
+                                      title={a.user?.fullName}
+                                      className="w-4 h-4 rounded-full bg-[#f0f2f5] ring-1 ring-white flex-shrink-0 object-cover"
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <img
+                                  src={
+                                    task.assignedTo?.avatarUrl ||
+                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${task.assignedToId || 'default'}`
+                                  }
+                                  alt={task.assignedTo?.fullName || 'Üye'}
+                                  className="w-4 h-4 rounded-full bg-[#f0f2f5] flex-shrink-0 object-cover"
+                                />
+                              )}
                               <span className="truncate font-medium text-[#111b21]">
-                                {task.assignedTo?.fullName?.split(' ')[0] || 'Atanmamış'}
+                                {task.assignees && task.assignees.length > 0
+                                  ? task.assignees.map((a) => a.user?.fullName?.split(' ')[0]).filter(Boolean).join(', ')
+                                  : task.assignedTo?.fullName?.split(' ')[0] || 'Atanmamış'}
                               </span>
                             </div>
 
