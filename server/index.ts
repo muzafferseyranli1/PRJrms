@@ -81,17 +81,46 @@ app.prepare().then(() => {
     res.json({ status: 'ok', service: 'PRJrms Team Chat & Task Engine', time: new Date().toISOString() });
   });
 
-  // 1. Auth: Login
+  // 1. Auth: Login (E-Posta veya Kullanıcı Adı ile Giriş)
   server.post('/api/auth/login', async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ error: 'E-posta ve şifre zorunludur' });
+      const { email, username, login: loginField, password } = req.body;
+      const rawIdentifier = (loginField || username || email || '').trim();
+      
+      if (!rawIdentifier || !password) {
+        return res.status(400).json({ error: 'Kullanıcı adı / e-posta ve şifre zorunludur' });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email: email.trim().toLowerCase() },
+      const identifier = rawIdentifier.toLowerCase();
+      const cleanIdentifier = identifier.replace(/[^a-z0-9]/g, '');
+
+      // 1. Doğrudan e-posta, e-posta ön eki veya isim ile ara
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: { equals: identifier, mode: 'insensitive' } },
+            { email: { startsWith: `${identifier}@`, mode: 'insensitive' } },
+            { fullName: { equals: rawIdentifier, mode: 'insensitive' } },
+          ],
+        },
       });
+
+      // 2. Ana Yönetici Kısayolları (muzaffer, muzafferseyranli, admin)
+      if (!user && (identifier === 'muzaffer' || identifier === 'muzaffer.seyranli' || cleanIdentifier === 'muzafferseyranli' || identifier === 'admin')) {
+        user = await prisma.user.findUnique({
+          where: { email: MASTER_ADMIN_EMAIL },
+        });
+      }
+
+      // 3. E-posta ön eki normalize edilmiş arama (örn: ahmet.yilmaz -> ahmet)
+      if (!user) {
+        const allUsers = await prisma.user.findMany({ where: { isActive: true } });
+        user = allUsers.find((u) => {
+          const emailPrefix = u.email.split('@')[0].toLowerCase();
+          const cleanEmailPrefix = emailPrefix.replace(/[^a-z0-9]/g, '');
+          return emailPrefix === identifier || cleanEmailPrefix === cleanIdentifier;
+        }) || null;
+      }
 
       if (!user || !user.isActive) {
         return res.status(401).json({ error: 'Kullanıcı bulunamadı veya hesabı devre dışı' });

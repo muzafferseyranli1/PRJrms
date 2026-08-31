@@ -2,18 +2,18 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, MessageSquare, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
+import { Shield, MessageSquare, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!identifier || !password) {
       setError('Lütfen tüm alanları doldurun');
       return;
     }
@@ -25,7 +25,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ login: identifier.trim(), password }),
       });
 
       const data = await res.json();
@@ -74,18 +74,20 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-3.5 sm:space-y-4">
             <div>
               <label className="block text-xs font-medium text-[#54656f] mb-1">
-                E-Posta Adresi
+                Kullanıcı Adı veya E-Posta
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 sm:pl-3.5 flex items-center pointer-events-none text-[#8696a0]">
-                  <Mail className="w-4 h-4" />
+                  <User className="w-4 h-4" />
                 </div>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@adresiniz.com"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Örn: muzaffer veya e-posta"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2.5 bg-[#f0f2f5] border border-[#e9edef] rounded-xl text-xs sm:text-sm text-[#111b21] placeholder-[#8696a0] focus:outline-none focus:border-[#008069] focus:bg-white transition"
                 />
               </div>
