@@ -14,6 +14,7 @@ interface Props {
   onLogout: () => void;
   onUserCreated: () => void;
   onProfileUpdated: (user: UserSession) => void;
+  className?: string;
 }
 
 export default function Sidebar({
@@ -24,6 +25,7 @@ export default function Sidebar({
   onLogout,
   onUserCreated,
   onProfileUpdated,
+  className = '',
 }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -34,7 +36,7 @@ export default function Sidebar({
   );
 
   return (
-    <aside className="w-80 md:w-96 h-full flex flex-col bg-[#111b21] border-r border-[#222e35] select-none">
+    <aside className={`w-full md:w-80 lg:w-96 h-full flex flex-col bg-[#111b21] border-r border-[#222e35] select-none ${className}`}>
       {/* Top Header */}
       <div className="h-16 px-4 flex items-center justify-between bg-[#202c33] border-b border-[#222e35]">
         <div className="flex items-center gap-3">
@@ -96,7 +98,7 @@ export default function Sidebar({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Sohbet veya grup ara..."
-            className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-1.5 text-xs text-[#e9edef] placeholder-[#8696a0]/60 focus:outline-none focus:border-[#00a884]"
+            className="w-full bg-[#202c33] border border-[#2a3942] rounded-xl pl-10 pr-4 py-2 text-xs text-[#e9edef] placeholder-[#8696a0]/60 focus:outline-none focus:border-[#00a884]"
           />
         </div>
       </div>
@@ -122,7 +124,7 @@ export default function Sidebar({
               <div
                 key={group.id}
                 onClick={() => onSelectGroup(group.id)}
-                className={`flex items-center gap-3.5 px-4 py-3 cursor-pointer transition ${
+                className={`flex items-center gap-3.5 px-4 py-3.5 cursor-pointer transition ${
                   isActive
                     ? 'bg-[#2a3942] border-l-4 border-[#00a884]'
                     : 'hover:bg-[#202c33]/70'

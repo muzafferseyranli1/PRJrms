@@ -26,6 +26,9 @@ export default function ChatPage() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Mobile View Navigation State: 'sidebar' (list) or 'chat' (active conversation)
+  const [activeMobileView, setActiveMobileView] = useState<'sidebar' | 'chat'>('sidebar');
+
   // Modals & Panels State
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<MessageItemType | null>(null);
@@ -258,24 +261,30 @@ export default function ChatPage() {
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0];
 
   return (
-    <div className="h-screen w-screen flex bg-[#0b141a] text-[#e9edef] overflow-hidden">
-      {/* 1. Left Sidebar */}
+    <div className="h-[100dvh] w-screen flex bg-[#0b141a] text-[#e9edef] overflow-hidden">
+      {/* 1. Left Sidebar: On mobile, visible when activeMobileView === 'sidebar'. On desktop, always visible */}
       <Sidebar
         groups={groups}
         activeGroupId={activeGroupId}
         onSelectGroup={(id) => {
           setActiveGroupId(id);
           setReplyingTo(null);
+          setActiveMobileView('chat'); // Switch to chat view on mobile
         }}
         currentUser={currentUser}
         onLogout={handleLogout}
         onUserCreated={fetchGroups}
         onProfileUpdated={(updated) => setCurrentUser(updated)}
+        className={`${activeMobileView === 'chat' ? 'hidden md:flex' : 'flex'}`}
       />
 
-      {/* 2. Main Chat Area */}
+      {/* 2. Main Chat Area: On mobile, visible when activeMobileView === 'chat'. On desktop, always visible */}
       {activeGroup ? (
-        <main className="flex-1 h-full flex flex-col relative chat-bg-pattern min-w-0">
+        <main
+          className={`flex-1 h-full flex flex-col relative chat-bg-pattern min-w-0 ${
+            activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'
+          }`}
+        >
           {/* Chat Header */}
           <ChatHeader
             group={activeGroup}
@@ -283,16 +292,17 @@ export default function ChatPage() {
             isTaskPanelOpen={isTaskPanelOpen}
             onToggleTaskPanel={() => setIsTaskPanelOpen(!isTaskPanelOpen)}
             typingUsers={typingUsers}
+            onBackToSidebar={() => setActiveMobileView('sidebar')}
           />
 
           {/* Messages Scroll Area */}
           <div
             ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-1"
+            className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-1"
           >
             {/* Top Date Header */}
             <div className="flex justify-center my-2">
-              <span className="px-3 py-1 rounded-lg bg-[#111b21]/80 border border-[#222e35] text-[11px] text-[#8696a0]">
+              <span className="px-3 py-1 rounded-lg bg-[#111b21]/80 border border-[#222e35] text-[10px] sm:text-[11px] text-[#8696a0]">
                 Bugün
               </span>
             </div>
@@ -302,8 +312,8 @@ export default function ChatPage() {
                 key={msg.id}
                 message={msg}
                 currentUser={currentUser}
-                onOpenContextMenu={(e, m) => {
-                  setContextMenu({ x: e.clientX, y: e.clientY, message: m });
+                onOpenContextMenu={(coords, m) => {
+                  setContextMenu({ x: coords.clientX, y: coords.clientY, message: m });
                 }}
                 onImageClick={(url, name) => setLightboxImage({ url, name })}
                 onScrollToMessage={handleScrollToMessage}
@@ -323,7 +333,7 @@ export default function ChatPage() {
           />
         </main>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center ${activeMobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
           <MessageSquare className="w-16 h-16 text-[#8696a0]/40 mb-4" />
           <h3 className="text-lg font-semibold text-white">Sohbet Seçin</h3>
           <p className="text-xs text-[#8696a0] max-w-sm mt-1">
