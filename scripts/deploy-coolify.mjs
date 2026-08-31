@@ -23,7 +23,7 @@ async function main() {
     if (status) {
       log('Değişiklikler commit ediliyor...');
       execSync('git add .');
-      execSync('git commit -m "fix: Prisma binaryTargets and host.docker.internal database connection"');
+      execSync('git commit -m "fix: Direct VPS PostgreSQL IP connection 188.132.198.144"');
     }
     log('GitHub reposuna push yapılıyor (main dalı)...');
     execSync('git push origin main');
@@ -57,10 +57,9 @@ async function main() {
   }
 
   // 3. Set Env Variables on Coolify Application
-  // Use host.docker.internal to allow container on VPS to reach host PostgreSQL directly
   log('3. Coolify ortam değişkenleri senkronize ediliyor...');
   const envs = [
-    { key: 'DATABASE_URL', value: 'postgresql://postgres:RMSv3_Local_Password_2026!@host.docker.internal:5432/prjrms_db?schema=public' },
+    { key: 'DATABASE_URL', value: 'postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public' },
     { key: 'JWT_SECRET', value: 'prjrms_super_secret_jwt_key_2026_x1892_production' },
     { key: 'PORT', value: '3050' },
     { key: 'NEXT_PUBLIC_APP_URL', value: 'http://188.132.198.144:3050' },
@@ -83,7 +82,7 @@ async function main() {
       // ignore
     }
   }
-  log('✅ Ortam değişkenleri doğrulandı (host.docker.internal).');
+  log('✅ Ortam değişkenleri doğrulandı (188.132.198.144).');
 
   // 4. Trigger Deploy
   log('4. Coolify derleme ve container ayağa kaldırma tetikleniyor...');
