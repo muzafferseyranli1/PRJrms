@@ -14,6 +14,7 @@ import EditTaskModal from '@/components/task/EditTaskModal';
 import TaskSidePanel from '@/components/task/TaskSidePanel';
 import TaskKanbanView from '@/components/task/TaskKanbanView';
 import TaskGridView from '@/components/task/TaskGridView';
+import WhatsAppConnectModal, { WhatsAppStatusData } from '@/components/whatsapp/WhatsAppConnectModal';
 import {
   UserSession,
   GroupItem,
@@ -55,6 +56,19 @@ export default function ChatPage() {
   const [completeTaskItem, setCompleteTaskItem] = useState<TaskItem | null>(null);
   const [editTaskItem, setEditTaskItem] = useState<TaskItem | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
+
+  // WhatsApp State
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [waStatus, setWaStatus] = useState<WhatsAppStatusData>({
+    status: 'disconnected',
+    qrCodeDataUrl: null,
+    phone: null,
+    pushname: null,
+    lastError: null,
+    boundGroupId: null,
+    boundGroupName: null,
+    boundChatId: null,
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -253,6 +267,10 @@ export default function ChatPage() {
     socket.on('message_task_updated', handleMessageTaskUpdated);
     socket.on('user_typing', handleUserTyping);
 
+    // WhatsApp Socket Events
+    const handleWaStatus = (data: WhatsAppStatusData) => setWaStatus(data);
+    socket.on('whatsapp_status', handleWaStatus);
+
     return () => {
       socket.emit('leave_group', activeGroupId);
       socket.off('new_message', handleNewMessage);
@@ -263,8 +281,32 @@ export default function ChatPage() {
       socket.off('task_updated', handleTaskUpdated);
       socket.off('message_task_updated', handleMessageTaskUpdated);
       socket.off('user_typing', handleUserTyping);
+      socket.off('whatsapp_status', handleWaStatus);
     };
   }, [currentUser, activeGroupId]);
+
+  // Fetch WhatsApp status on mount
+  useEffect(() => {
+    const token = localStorage.getItem('prjrms_token');
+    if (!token) return;
+    fetch('/api/whatsapp/status', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setWaStatus(data); })
+      .catch(() => {});
+  }, []);
+
+  const refreshWaStatus = async () => {
+    const token = localStorage.getItem('prjrms_token');
+    if (!token) return;
+    try {
+      const r = await fetch('/api/whatsapp/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) setWaStatus(await r.json());
+    } catch {}
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -415,6 +457,8 @@ export default function ChatPage() {
             onChangeView={(view) => setCurrentView(view)}
             onBackToSidebar={() => setActiveMobileView('sidebar')}
             onDeleteGroup={handleDeleteGroup}
+            onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+            waStatus={waStatus}
           />
 
           {/* VIEW 1: CHAT STREAM */}
@@ -555,6 +599,18 @@ export default function ChatPage() {
         fileName={lightboxImage?.name}
         onClose={() => setLightboxImage(null)}
       />
+
+      {/* 9. WhatsApp Connect Modal */}
+      {activeGroup && (
+        <WhatsAppConnectModal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          currentGroupId={activeGroup.id}
+          currentGroupName={activeGroup.name}
+          waStatus={waStatus}
+          onRefresh={refreshWaStatus}
+        />
+      )}
     </div>
   );
 }

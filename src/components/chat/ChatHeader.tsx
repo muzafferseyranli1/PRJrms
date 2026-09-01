@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { GroupItem, UserSession } from '@/lib/types';
 import { requestNotificationPermission, playNotificationSound } from '@/lib/notifications';
+import { WhatsAppStatusData } from '../whatsapp/WhatsAppConnectModal';
 
 export type MainViewType = 'chat' | 'kanban' | 'table';
 
@@ -28,6 +29,8 @@ interface Props {
   onChangeView: (view: MainViewType) => void;
   onBackToSidebar?: () => void;
   onDeleteGroup: (groupId: string) => void;
+  onOpenWhatsAppModal?: () => void;
+  waStatus?: WhatsAppStatusData;
 }
 
 export default function ChatHeader({
@@ -41,6 +44,8 @@ export default function ChatHeader({
   onChangeView,
   onBackToSidebar,
   onDeleteGroup,
+  onOpenWhatsAppModal,
+  waStatus,
 }: Props) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -153,6 +158,38 @@ export default function ChatHeader({
 
         {/* Right: Notification Bell & Actions */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          {/* WhatsApp Web Connect / Status Button */}
+          {onOpenWhatsAppModal && (
+            <button
+              onClick={onOpenWhatsAppModal}
+              title={
+                waStatus?.status === 'ready'
+                  ? `WhatsApp Bağlı (+${waStatus.phone || ''})`
+                  : waStatus?.status === 'qr'
+                  ? 'WhatsApp QR Kod Bekleniyor'
+                  : 'WhatsApp Bağla'
+              }
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition border ${
+                waStatus?.status === 'ready'
+                  ? 'bg-[#25D366]/10 text-[#008069] border-[#25D366]/30 hover:bg-[#25D366]/20'
+                  : waStatus?.status === 'qr'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse'
+                  : 'bg-white text-[#54656f] border-[#e9edef] hover:border-[#25D366]'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  waStatus?.status === 'ready'
+                    ? 'bg-[#25D366]'
+                    : waStatus?.status === 'qr'
+                    ? 'bg-amber-500 animate-ping'
+                    : 'bg-gray-400'
+                }`}
+              />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </button>
+          )}
+
           {/* Notification / Sound Toggle */}
           <button
             onClick={handleToggleNotifications}

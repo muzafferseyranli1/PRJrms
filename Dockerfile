@@ -4,7 +4,10 @@
 
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Dependencies Stage
 FROM base AS deps
@@ -33,13 +36,15 @@ ENV PORT=3050
 ENV DATABASE_URL="postgresql://postgres:RMSv3_Local_Password_2026!@188.132.198.144:5432/prjrms_db?schema=public"
 ENV JWT_SECRET="prjrms_super_secret_jwt_key_2026_x1892_production"
 ENV NEXT_PUBLIC_APP_URL="http://188.132.198.144:3050"
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 WORKDIR /app
 
-RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public
+RUN mkdir -p /app/public/uploads /app/.wwebjs_auth && chown -R nextjs:nodejs /app/public /app/.wwebjs_auth
 
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules

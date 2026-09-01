@@ -10,6 +10,17 @@ import dotenv from 'dotenv';
 import { prisma } from '../src/lib/prisma';
 import { signToken, verifyToken, hashPassword, comparePassword } from '../src/lib/auth';
 import { UserRole, GroupRole, MessageType, TaskStatus, TaskPriority } from '@prisma/client';
+import {
+  initWhatsAppService,
+  getWhatsAppStatus,
+  reconnectWhatsApp,
+  disconnectWhatsApp,
+  getWhatsAppChats,
+  bindWhatsAppGroup,
+  notifyWhatsAppTaskCreated,
+  notifyWhatsAppTaskCompleted,
+  notifyWhatsAppTaskReopened,
+} from './whatsapp-service';
 
 dotenv.config();
 
@@ -592,6 +603,35 @@ app.prepare().then(() => {
     }
   });
 
+  // 9. WhatsApp Integration Endpoints
+  server.get('/api/whatsapp/status', requireAuth, (req: Request, res: Response) => {
+    return res.json(getWhatsAppStatus());
+  });
+
+  server.post('/api/whatsapp/connect', requireAuth, async (req: Request, res: Response) => {
+    await reconnectWhatsApp();
+    return res.json(getWhatsAppStatus());
+  });
+
+  server.post('/api/whatsapp/disconnect', requireAuth, async (req: Request, res: Response) => {
+    await disconnectWhatsApp();
+    return res.json({ success: true });
+  });
+
+  server.get('/api/whatsapp/chats', requireAuth, async (req: Request, res: Response) => {
+    const chats = await getWhatsAppChats();
+    return res.json({ chats });
+  });
+
+  server.post('/api/whatsapp/bind-group', requireAuth, async (req: Request, res: Response) => {
+    const { groupId, waChatId } = req.body;
+    if (!groupId || !waChatId) {
+      return res.status(400).json({ error: 'Grup ID ve WhatsApp Chat ID gereklidir.' });
+    }
+    await bindWhatsAppGroup(groupId, waChatId);
+    return res.json({ success: true });
+  });
+
   // ==========================================
   // SOCKET.IO REALTIME ENGINE
   // ==========================================
@@ -602,6 +642,9 @@ app.prepare().then(() => {
     },
     maxHttpBufferSize: 1e8,
   });
+
+  // Initialize WhatsApp Background Service
+  initWhatsAppService(io, prisma);
 
   // Socket Auth Middleware
   io.use((socket, nextStep) => {
@@ -868,6 +911,9 @@ app.prepare().then(() => {
           task,
         });
 
+        // WhatsApp Notification
+        notifyWhatsAppTaskCreated(task);
+
         // Also emit a system message notification in chat
         const assignee = await prisma.user.findUnique({ where: { id: assignedToId } });
         const systemMsg = await prisma.message.create({
@@ -1028,6 +1074,7 @@ app.prepare().then(() => {
           });
 
           io.to(`group_${updatedTask.groupId}`).emit('new_message', reopenMsg);
+          notifyWhatsAppTaskReopened(updatedTask, user.fullName, data.reopenNote);
         }
       } catch (err: any) {
         console.error('Edit task socket error:', err);
@@ -1101,6 +1148,12 @@ app.prepare().then(() => {
           });
 
           io.to(`group_${updatedTask.groupId}`).emit('new_message', completionMsg);
+          notifyWhatsAppTaskCompleted(updatedTask, user.fullName, noteText);
+        }
+
+        // 🌟 GÖREV YENİDEN AÇILDIĞINDA GRUBA MESAJ AT 🌟
+        if (isReopening) {
+          notifyWhatsAppTaskReopened(updatedTask, user.fullName, reopenNote);
         }
 
         // 🌟 GÖREV YENİDEN AÇILDIĞINDA GRUBA OTOMATİK MESAJ AT 🌟
