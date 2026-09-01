@@ -28,13 +28,26 @@ export default function WhatsAppConnectModal(props: Props) {
   const [loading, setLoading] = useState(false);
   const [chats, setChats] = useState<any[]>([]);
   const [chatId, setChatId] = useState('');
+  const [manualId, setManualId] = useState('');
+  const [showManual, setShowManual] = useState(false);
   const [ok, setOk] = useState(false);
+  const [refreshingChats, setRefreshingChats] = useState(false);
 
   const tok = () => (typeof window !== 'undefined' ? localStorage.getItem('prjrms_token') || '' : '');
 
   const loadChats = async () => {
-    const r = await fetch('/api/whatsapp/chats', { headers: { Authorization: 'Bearer ' + tok() } });
-    if (r.ok) { const d = await r.json(); setChats(d.chats || []); }
+    setRefreshingChats(true);
+    try {
+      const r = await fetch('/api/whatsapp/chats', { headers: { Authorization: 'Bearer ' + tok() } });
+      if (r.ok) {
+        const d = await r.json();
+        setChats(d.chats || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshingChats(false);
+    }
   };
 
   useEffect(() => {
@@ -56,13 +69,14 @@ export default function WhatsAppConnectModal(props: Props) {
     onRefresh(); setLoading(false);
   };
 
-  const doBind = async () => {
-    if (!chatId) return;
+  const doBind = async (targetId?: string) => {
+    const finalChatId = targetId || (showManual ? manualId.trim() : chatId);
+    if (!finalChatId) return;
     setLoading(true);
     const r = await fetch('/api/whatsapp/bind-group', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok() },
-      body: JSON.stringify({ groupId: currentGroupId, waChatId: chatId }),
+      body: JSON.stringify({ groupId: currentGroupId, waChatId: finalChatId }),
     });
     if (r.ok) { setOk(true); setTimeout(() => setOk(false), 3000); }
     setLoading(false);
@@ -89,10 +103,10 @@ export default function WhatsAppConnectModal(props: Props) {
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-200">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-gray-500">Durum:</span>
-              {s === 'ready' && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Bagli</span>}
-              {s === 'qr' && <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse"><QrCode className="w-3 h-3" /> QR Bekliyor</span>}
-              {s === 'connecting' && <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Baslatiliyor</span>}
-              {s === 'disconnected' && <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Bagli Degil</span>}
+              {s === 'ready' && <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Bagli</span>}
+              {s === 'qr' && <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse"><QrCode className="w-3 h-3" /> QR Bekliyor</span>}
+              {s === 'connecting' && <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Baslatiliyor</span>}
+              {s === 'disconnected' && <span className="text-xs font-bold text-red-700 bg-red-100 px-2.5 py-0.5 rounded-full flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Bagli Degil</span>}
             </div>
             <button onClick={onRefresh} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-lg"><RefreshCw className="w-3.5 h-3.5" /></button>
           </div>
@@ -112,16 +126,94 @@ export default function WhatsAppConnectModal(props: Props) {
                 {waStatus.phone && <p className="text-xs text-gray-600 pl-6">+{waStatus.phone}</p>}
                 {waStatus.pushname && <p className="text-xs text-gray-600 pl-6">{waStatus.pushname}</p>}
               </div>
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
-                <p className="text-xs font-bold">{currentGroupName} icin WhatsApp grubu sec:</p>
-                <select value={chatId} onChange={(e) => setChatId(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs">
-                  <option value="">-- Grup Sec ({chats.length}) --</option>
-                  {chats.map((c: any) => (<option key={c.id} value={c.id}>{c.isGroup ? "G: " : "K: "}{c.name}</option>))}
-                </select>
-                <div className="flex items-center gap-2">
-                  <button onClick={doBind} disabled={!chatId || loading} className="px-3 py-1.5 bg-green-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50">Eslestir</button>
-                  {ok && <span className="text-xs text-green-600 font-bold">Eslestirildi!</span>}
+
+              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-800">
+                    "{currentGroupName}" için WhatsApp Grubu:
+                  </p>
+                  <button
+                    onClick={loadChats}
+                    disabled={refreshingChats}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-[#008069] hover:underline"
+                    title="Sohbetleri Yeniden Yükle"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${refreshingChats ? 'animate-spin' : ''}`} />
+                    <span>Yenile</span>
+                  </button>
                 </div>
+
+                {!showManual ? (
+                  <div className="space-y-2">
+                    <select
+                      value={chatId}
+                      onChange={(e) => setChatId(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 focus:outline-none"
+                    >
+                      <option value="">-- Grup Seçiniz ({chats.length} sohbet bulundu) --</option>
+                      {chats.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.isGroup ? '👥 Grup: ' : '👤 Kişi: '}{c.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        onClick={() => doBind()}
+                        disabled={!chatId || loading}
+                        className="px-4 py-2 bg-[#008069] hover:bg-[#00705a] text-white text-xs font-bold rounded-xl disabled:opacity-50 transition"
+                      >
+                        Grubu Eşleştir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowManual(true)}
+                        className="text-[11px] text-gray-500 hover:text-gray-800 underline"
+                      >
+                        Manuel ID ile Eşle
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="WhatsApp Chat ID (örn: 120363... veya 90533...)"
+                      value={manualId}
+                      onChange={(e) => setManualId(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-800 focus:outline-none"
+                    />
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        onClick={() => doBind(manualId.trim())}
+                        disabled={!manualId.trim() || loading}
+                        className="px-4 py-2 bg-[#008069] hover:bg-[#00705a] text-white text-xs font-bold rounded-xl disabled:opacity-50 transition"
+                      >
+                        Manuel ID Eşleştir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowManual(false)}
+                        className="text-[11px] text-gray-500 hover:text-gray-800 underline"
+                      >
+                        Listeden Seç
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {ok && (
+                  <p className="text-xs text-green-600 font-bold bg-green-50 p-2 rounded-lg text-center">
+                    ✅ WhatsApp Grubu Başarıyla Eşleştirildi!
+                  </p>
+                )}
+
+                {chats.length === 0 && (
+                  <div className="p-2.5 bg-blue-50/80 rounded-xl border border-blue-100 text-[11px] text-blue-800 leading-relaxed">
+                    💡 <b>İpucu:</b> Telefonunuzdaki WhatsApp grubuna herhangi bir mesaj (veya <code>!gorev test</code>) gönderip ardından yukarıdaki <b>Yenile</b> butonuna basarsanız grup otomatik olarak listeye eklenecektir.
+                  </div>
+                )}
               </div>
             </div>
           )}

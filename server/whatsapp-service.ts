@@ -31,6 +31,8 @@ let state: WhatsAppState = {
   boundChatId: null,
 };
 
+const cachedChatsMap = new Map<string, { id: string; name: string; isGroup: boolean; unreadCount?: number }>();
+
 // Clean and normalize phone number for matching
 function normalizePhone(raw: string): string {
   return raw.replace(/[^0-9]/g, '');
@@ -192,6 +194,17 @@ async function handleIncomingWhatsAppMessage(msg: WAMessage) {
   if (msg.isStatus || msg.type === 'e2e_notification') return;
 
   const chat = await msg.getChat();
+  if (chat && chat.id) {
+    const rawId = chat.id._serialized || (typeof chat.id === 'string' ? chat.id : '');
+    if (rawId) {
+      const isGrp = chat.isGroup || rawId.endsWith('@g.us');
+      cachedChatsMap.set(rawId, {
+        id: rawId,
+        name: chat.name || (chat as any).formattedTitle || (isGrp ? 'WhatsApp Grubu' : 'Kişi'),
+        isGroup: isGrp,
+      });
+    }
+  }
 
   // Hedef grubu bul
   const targetGroup = await getTargetGroup(chat.id._serialized);
@@ -431,21 +444,92 @@ export async function disconnectWhatsApp() {
 
 // WhatsApp Gruplarını Listele
 export async function getWhatsAppChats() {
-  if (!client || state.status !== 'ready') {
-    return [];
+  if (!client) {
+    return Array.from(cachedChatsMap.values());
   }
+
+  // 1. Try standard getChats()
   try {
     const chats = await client.getChats();
-    return chats.map((c) => ({
-      id: c.id._serialized,
-      name: c.name,
-      isGroup: c.isGroup,
-      unreadCount: c.unreadCount,
-    }));
+    if (chats && chats.length > 0) {
+      for (const c of chats) {
+        if (c && c.id) {
+          const cid = c.id._serialized || (typeof c.id === 'string' ? c.id : '');
+          if (cid) {
+            const isGrp = c.isGroup || cid.endsWith('@g.us');
+            cachedChatsMap.set(cid, {
+              id: cid,
+              name: c.name || (c as any).formattedTitle || (isGrp ? 'WhatsApp Grubu' : 'Kişi'),
+              isGroup: isGrp,
+              unreadCount: c.unreadCount || 0,
+            });
+          }
+        }
+      }
+    }
   } catch (err) {
-    console.error('[WhatsApp] Sohbetleri listeleme hatası:', err);
-    return [];
+    console.warn('[WhatsApp] client.getChats() fallback denenecek:', err);
   }
+
+  // 2. Puppeteer Store Evaluation Fallback
+  try {
+    // @ts-ignore
+    const page = client.pupPage;
+    if (page) {
+      const evalChats = await page.evaluate(() => {
+        const out: any[] = [];
+        const w = window as any;
+        try {
+          if (w.Store && w.Store.Chat) {
+            const models = w.Store.Chat.models || w.Store.Chat._models || [];
+            for (const m of models) {
+              const id = m.id?._serialized || (typeof m.id === 'string' ? m.id : null);
+              if (id) {
+                out.push({
+                  id,
+                  name: m.name || m.formattedTitle || m.contact?.name || m.title || id,
+                  isGroup: m.isGroup || id.endsWith('@g.us'),
+                  unreadCount: m.unreadCount || 0,
+                });
+              }
+            }
+          }
+          if (w.Store && w.Store.GroupMetadata) {
+            const gmodels = w.Store.GroupMetadata.models || w.Store.GroupMetadata._models || [];
+            for (const gm of gmodels) {
+              const gid = gm.id?._serialized || (typeof gm.id === 'string' ? gm.id : null);
+              if (gid) {
+                out.push({
+                  id: gid,
+                  name: gm.subject || gm.name || 'WhatsApp Grubu',
+                  isGroup: true,
+                });
+              }
+            }
+          }
+        } catch (e) {}
+        return out;
+      });
+
+      if (Array.isArray(evalChats)) {
+        for (const item of evalChats) {
+          if (item && item.id) {
+            cachedChatsMap.set(item.id, item);
+          }
+        }
+      }
+    }
+  } catch (evalErr) {
+    console.warn('[WhatsApp] page evaluate fallback uyarısı:', evalErr);
+  }
+
+  // 3. Return cached items sorted with groups first
+  const list = Array.from(cachedChatsMap.values());
+  return list.sort((a, b) => {
+    if (a.isGroup && !b.isGroup) return -1;
+    if (!a.isGroup && b.isGroup) return 1;
+    return a.name.localeCompare(b.name, 'tr');
+  });
 }
 
 // Bir PRJrms Grubu ile WhatsApp Grubunu Eşleştir
