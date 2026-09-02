@@ -31,7 +31,8 @@ let state: WhatsAppState = {
   boundChatId: null,
 };
 
-const cachedChatsMap = new Map<string, { id: string; name: string; isGroup: boolean; unreadCount?: number }>();
+const cachedChatsMap = new Map<string, { id: string; name: string; isGroup: boolean; number?: string; unreadCount?: number; type?: string; boundGroup?: { id: string; name: string } }>();
+const processedMessageIds = new Set<string>();
 
 // Clean and normalize phone number for matching
 export function normalizePhone(raw: string): string {
@@ -216,7 +217,16 @@ export function initWhatsAppService(io: SocketIOServer, prisma: PrismaClient) {
       broadcastStatus();
     });
 
-    // 📩 INBOUND MESSAGE & MEDIA HANDLER
+    // 📩 INCOMING MESSAGES (From others)
+    client.on('message', async (msg: WAMessage) => {
+      try {
+        await handleIncomingWhatsAppMessage(msg);
+      } catch (err) {
+        console.error('[WhatsApp] Gelen mesaj işleme hatası:', err);
+      }
+    });
+
+    // 📩 ALL MESSAGES (Both incoming & outgoing)
     client.on('message_create', async (msg: WAMessage) => {
       try {
         await handleIncomingWhatsAppMessage(msg);
@@ -241,27 +251,60 @@ export function initWhatsAppService(io: SocketIOServer, prisma: PrismaClient) {
 
 async function handleIncomingWhatsAppMessage(msg: WAMessage) {
   if (!prismaInstance || !ioInstance) return;
-  if (msg.isStatus || msg.type === 'e2e_notification') return;
+  if (!msg || msg.isStatus || msg.type === 'e2e_notification' || msg.type === 'protocol') return;
 
-  const chat = await msg.getChat();
-  const rawChatId = chat.id?._serialized || (typeof chat.id === 'string' ? chat.id : '');
+  const msgId = msg.id?._serialized || (typeof msg.id === 'string' ? msg.id : '');
+  if (msgId && processedMessageIds.has(msgId)) {
+    return; // De-duplicate
+  }
+  if (msgId) {
+    processedMessageIds.add(msgId);
+    if (processedMessageIds.size > 2000) {
+      const first = processedMessageIds.values().next().value;
+      if (first) processedMessageIds.delete(first);
+    }
+  }
+
+  // Determine chat ID: if from me -> to or from, else from
+  let rawChatId = msg.fromMe ? (msg.to || msg.from) : msg.from;
+  if (!rawChatId) {
+    try {
+      const chat = await msg.getChat();
+      rawChatId = chat.id?._serialized || (typeof chat.id === 'string' ? chat.id : '');
+    } catch (e) {}
+  }
   if (!rawChatId) return;
 
-  const isGroup = chat.isGroup || rawChatId.endsWith('@g.us');
-  const chatTitle = chat.name || (chat as any).formattedTitle || (isGroup ? 'WhatsApp Grubu' : 'WhatsApp Kişisi');
+  const isGroup = rawChatId.endsWith('@g.us');
+
+  // Determine Sender Number and Pushname
+  let rawSenderNumber = '';
+  if (msg.fromMe) {
+    rawSenderNumber = state.phone || (client?.info?.wid?.user || '');
+  } else {
+    rawSenderNumber = msg.author ? msg.author.split('@')[0] : rawChatId.split('@')[0];
+  }
+
+  let pushname = (msg as any)._data?.notifyName || (msg as any).notifyName || '';
+  let chatTitle = isGroup ? 'WhatsApp Grubu' : 'WhatsApp Kişisi';
+
+  try {
+    const chat = await msg.getChat();
+    if (chat) {
+      chatTitle = chat.name || (chat as any).formattedTitle || chatTitle;
+    }
+  } catch (e) {}
 
   // Önbelleğe kaydet
   cachedChatsMap.set(rawChatId, {
     id: rawChatId,
     name: chatTitle,
     isGroup,
+    number: isGroup ? undefined : rawSenderNumber,
   });
 
   // Göndereni tespit et veya otomatik kullanıcı oluştur
-  const contact = await msg.getContact();
-  const rawSenderNumber = contact.number || (contact.id && contact.id.user) || (msg.author ? msg.author.split('@')[0] : msg.from.split('@')[0]);
-  const senderUser = await findOrCreateWhatsAppUser(rawSenderNumber, contact.pushname || contact.name);
-
+  const senderUser = await findOrCreateWhatsAppUser(rawSenderNumber, pushname);
   if (!senderUser) return;
 
   // Hedef grubu bul veya otomatik kanal oluştur (hem birebir hem grup için)
@@ -269,18 +312,20 @@ async function handleIncomingWhatsAppMessage(msg: WAMessage) {
   if (!targetGroup) return;
 
   // Grup üyeliği yoksa ekle
-  const existingMember = await prismaInstance.groupMember.findFirst({
-    where: { groupId: targetGroup.id, userId: senderUser.id },
-  });
-  if (!existingMember) {
-    await prismaInstance.groupMember.create({
-      data: {
-        groupId: targetGroup.id,
-        userId: senderUser.id,
-        role: senderUser.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
-      },
+  try {
+    const existingMember = await prismaInstance.groupMember.findFirst({
+      where: { groupId: targetGroup.id, userId: senderUser.id },
     });
-  }
+    if (!existingMember) {
+      await prismaInstance.groupMember.create({
+        data: {
+          groupId: targetGroup.id,
+          userId: senderUser.id,
+          role: senderUser.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+        },
+      });
+    }
+  } catch (e) {}
 
   // 📷 MEDYA / DOSYA İNDİRME
   let attachmentsData: Array<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> = [];
