@@ -17,6 +17,8 @@ import {
   disconnectWhatsApp,
   getWhatsAppChats,
   bindWhatsAppGroup,
+  createChannelForWhatsApp,
+  sendWhatsAppMessageToChat,
   notifyWhatsAppTaskCreated,
   notifyWhatsAppTaskCompleted,
   notifyWhatsAppTaskReopened,
@@ -632,6 +634,15 @@ app.prepare().then(() => {
     return res.json({ success: true });
   });
 
+  server.post('/api/whatsapp/create-channel', requireAuth, async (req: Request, res: Response) => {
+    const { waChatId, name, isGroup } = req.body;
+    if (!waChatId || !name) {
+      return res.status(400).json({ error: 'WhatsApp Chat ID ve İsim gereklidir.' });
+    }
+    const group = await createChannelForWhatsApp(waChatId, name, isGroup);
+    return res.json({ success: true, group });
+  });
+
   // ==========================================
   // SOCKET.IO REALTIME ENGINE
   // ==========================================
@@ -761,6 +772,15 @@ app.prepare().then(() => {
         });
 
         io.to(`group_${groupId}`).emit('new_message', newMessage);
+
+        // If this group is mapped to a WhatsApp chat, also send message to WhatsApp
+        if (content) {
+          prisma.group.findUnique({ where: { id: groupId } }).then((grp) => {
+            if (grp && grp.whatsappChatId) {
+              sendWhatsAppMessageToChat(grp.whatsappChatId, content);
+            }
+          }).catch(() => {});
+        }
       } catch (err: any) {
         console.error('Send message socket error:', err);
         socket.emit('error_message', { message: 'Mesaj gönderilemedi' });

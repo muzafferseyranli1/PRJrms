@@ -34,16 +34,16 @@ let state: WhatsAppState = {
 const cachedChatsMap = new Map<string, { id: string; name: string; isGroup: boolean; unreadCount?: number }>();
 
 // Clean and normalize phone number for matching
-function normalizePhone(raw: string): string {
+export function normalizePhone(raw: string): string {
   return raw.replace(/[^0-9]/g, '');
 }
 
-// Find system user matching a WhatsApp phone number or push name
-async function findUserByWhatsAppContact(rawNumber: string, pushname?: string) {
+// Find or auto-create a system user matching a WhatsApp contact
+async function findOrCreateWhatsAppUser(rawNumber: string, pushname?: string): Promise<any> {
   if (!prismaInstance) return null;
   const cleanPhone = normalizePhone(rawNumber);
 
-  // 1. Match by last 10 digits of phone (e.g. 5332760534)
+  // 1. Match by last 10 digits
   if (cleanPhone.length >= 10) {
     const last10 = cleanPhone.slice(-10);
     const users = await prismaInstance.user.findMany();
@@ -51,33 +51,84 @@ async function findUserByWhatsAppContact(rawNumber: string, pushname?: string) {
     if (matched) return matched;
   }
 
-  // 2. Match by full name if pushname provided
+  // 2. Match by full name
   if (pushname) {
     const trimmed = pushname.trim().toLowerCase();
     const users = await prismaInstance.user.findMany();
-    const matched = users.find((u) => u.fullName.toLowerCase().includes(trimmed) || trimmed.includes(u.fullName.toLowerCase()));
+    const matched = users.find((u) => u.fullName.toLowerCase() === trimmed || (u.fullName.length > 3 && trimmed.includes(u.fullName.toLowerCase())));
     if (matched) return matched;
   }
 
-  // 3. Fallback to Admin
-  return await prismaInstance.user.findFirst({ where: { role: 'ADMIN' } });
+  // 3. If not found, auto-create a user for this contact
+  try {
+    const displayName = pushname || (cleanPhone ? ('+' + cleanPhone) : 'WhatsApp Kullanıcısı');
+    const autoEmail = 'wa_' + (cleanPhone || Date.now()) + '@whatsapp.prjrms';
+    const newUser = await prismaInstance.user.create({
+      data: {
+        email: autoEmail,
+        fullName: displayName,
+        phone: cleanPhone || null,
+        passwordHash: '$2a$10$e84Wb3.H1234567890123456789012345678901234567890123456',
+        role: 'MEMBER',
+      },
+    });
+    return newUser;
+  } catch (err) {
+    return await prismaInstance.user.findFirst({ where: { role: 'ADMIN' } });
+  }
 }
 
-// Get or find default active PRJrms group to sync
-async function getTargetGroup(waChatId?: string) {
-  if (!prismaInstance) return null;
+// Find existing PRJrms group or auto-create channel for this WhatsApp chat
+async function getOrCreateTargetGroup(waChatId: string, chatTitle: string, isGroup: boolean, senderUser?: any): Promise<any> {
+  if (!prismaInstance || !ioInstance) return null;
 
-  if (waChatId) {
-    const groupWithWa = await prismaInstance.group.findFirst({
-      where: { whatsappChatId: waChatId },
-    });
-    if (groupWithWa) return groupWithWa;
+  // 1. Check if an existing group has this whatsappChatId
+  const existing = await prismaInstance.group.findFirst({
+    where: { whatsappChatId: waChatId },
+    include: { members: true },
+  });
+  if (existing) return existing;
+
+  // 2. Auto-create channel for this WhatsApp conversation
+  const adminUser = await prismaInstance.user.findFirst({ where: { role: 'ADMIN' } });
+  const membersToCreate: any[] = [];
+  if (adminUser) {
+    membersToCreate.push({ userId: adminUser.id, role: 'ADMIN' });
+  }
+  if (senderUser && adminUser && senderUser.id !== adminUser.id) {
+    membersToCreate.push({ userId: senderUser.id, role: 'MEMBER' });
   }
 
-  // Fallback to first group in database
-  return await prismaInstance.group.findFirst({
-    orderBy: { createdAt: 'asc' },
-  });
+  const groupName = isGroup ? (chatTitle || 'WhatsApp Grubu') : (chatTitle + ' (WhatsApp)');
+
+  try {
+    const newGroup = await prismaInstance.group.create({
+      data: {
+        name: groupName.slice(0, 100),
+        description: isGroup ? 'WhatsApp Grubu Senkronizasyonu' : ('WhatsApp Birebir Yazışma (' + chatTitle + ')'),
+        whatsappChatId: waChatId,
+        members: {
+          create: membersToCreate,
+        },
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, fullName: true, avatarUrl: true, role: true, email: true },
+            },
+          },
+        },
+        tasks: true,
+      },
+    });
+
+    // Notify web clients
+    ioInstance.emit('group_created', newGroup);
+    return newGroup;
+  } catch (e) {
+    return await prismaInstance.group.findFirst({ orderBy: { createdAt: 'asc' } });
+  }
 }
 
 export function initWhatsAppService(io: SocketIOServer, prisma: PrismaClient) {
@@ -190,32 +241,32 @@ export function initWhatsAppService(io: SocketIOServer, prisma: PrismaClient) {
 
 async function handleIncomingWhatsAppMessage(msg: WAMessage) {
   if (!prismaInstance || !ioInstance) return;
-
   if (msg.isStatus || msg.type === 'e2e_notification') return;
 
   const chat = await msg.getChat();
-  if (chat && chat.id) {
-    const rawId = chat.id._serialized || (typeof chat.id === 'string' ? chat.id : '');
-    if (rawId) {
-      const isGrp = chat.isGroup || rawId.endsWith('@g.us');
-      cachedChatsMap.set(rawId, {
-        id: rawId,
-        name: chat.name || (chat as any).formattedTitle || (isGrp ? 'WhatsApp Grubu' : 'Kişi'),
-        isGroup: isGrp,
-      });
-    }
-  }
+  const rawChatId = chat.id?._serialized || (typeof chat.id === 'string' ? chat.id : '');
+  if (!rawChatId) return;
 
-  // Hedef grubu bul
-  const targetGroup = await getTargetGroup(chat.id._serialized);
-  if (!targetGroup) return;
+  const isGroup = chat.isGroup || rawChatId.endsWith('@g.us');
+  const chatTitle = chat.name || (chat as any).formattedTitle || (isGroup ? 'WhatsApp Grubu' : 'WhatsApp Kişisi');
 
-  // Göndereni tespit et
+  // Önbelleğe kaydet
+  cachedChatsMap.set(rawChatId, {
+    id: rawChatId,
+    name: chatTitle,
+    isGroup,
+  });
+
+  // Göndereni tespit et veya otomatik kullanıcı oluştur
   const contact = await msg.getContact();
   const rawSenderNumber = contact.number || (contact.id && contact.id.user) || (msg.author ? msg.author.split('@')[0] : msg.from.split('@')[0]);
-  const senderUser = await findUserByWhatsAppContact(rawSenderNumber, contact.pushname || contact.name);
+  const senderUser = await findOrCreateWhatsAppUser(rawSenderNumber, contact.pushname || contact.name);
 
   if (!senderUser) return;
+
+  // Hedef grubu bul veya otomatik kanal oluştur (hem birebir hem grup için)
+  const targetGroup = await getOrCreateTargetGroup(rawChatId, chatTitle, isGroup, senderUser);
+  if (!targetGroup) return;
 
   // Grup üyeliği yoksa ekle
   const existingMember = await prismaInstance.groupMember.findFirst({
@@ -293,18 +344,26 @@ async function handleIncomingWhatsAppMessage(msg: WAMessage) {
   // Socket.io ile web arayüzüne yayınla
   ioInstance.to('group_' + targetGroup.id).emit('new_message', savedMessage);
 
-  // 🤖 BOT KOMUTU: !gorev veya !task ile WhatsApp içinden doğrudan görev oluşturma
-  if (messageText.startsWith('!gorev') || messageText.startsWith('!task') || messageText.startsWith('!plan')) {
-    await handleWhatsAppTaskCommand(msg, savedMessage, targetGroup.id, senderUser);
+  // 🤖 BOT KOMUTLARI: !gorev, !durum, !tamamla, !yardim
+  const lower = messageText.toLowerCase();
+  if (lower.startsWith('!gorev') || lower.startsWith('!task') || lower.startsWith('!plan')) {
+    await handleWhatsAppTaskCommand(msg, savedMessage, targetGroup.id, senderUser, isGroup);
+  } else if (lower.startsWith('!durum') || lower.startsWith('!gorevler') || lower.startsWith('!tasks')) {
+    await handleWhatsAppStatusCommand(msg, targetGroup.id);
+  } else if (lower.startsWith('!tamamla') || lower.startsWith('!bitti') || lower.startsWith('!done')) {
+    await handleWhatsAppCompleteCommand(msg, targetGroup.id, senderUser);
+  } else if (lower === '!yardim' || lower === '!help' || lower === '!komutlar') {
+    await handleWhatsAppHelpCommand(msg);
   }
 }
 
-// 🤖 WhatsApp Botu !gorev Komutu İşleyici
+// 🤖 WhatsApp Botu !gorev Komutu İşleyici (Grup veya Birebir Sohbet)
 async function handleWhatsAppTaskCommand(
   msg: WAMessage,
   sourceMessage: any,
   groupId: string,
-  createdByUser: any
+  createdByUser: any,
+  isGroup: boolean
 ) {
   if (!prismaInstance || !ioInstance) return;
 
@@ -326,37 +385,53 @@ async function handleWhatsAppTaskCommand(
     targetTitle = 'WhatsApp Üzerinden Açılan Görev';
   }
 
-  // Bahsedilen kişileri (mentions) çöz
+  // 1. Bahsedilen kişileri (mentions) çöz
   const mentions = await msg.getMentions();
   for (const contact of mentions) {
-    const u = await findUserByWhatsAppContact(contact.number, contact.name || contact.pushname);
+    const u = await findOrCreateWhatsAppUser(contact.number, contact.name || contact.pushname);
     if (u && !assignedUsers.some((x) => x.id === u.id)) {
       assignedUsers.push(u);
     }
   }
 
-  // Mention yoksa metin içinde isim ara
+  // 2. Mention yoksa metin içinde isim ara
   if (assignedUsers.length === 0) {
     const allUsers = await prismaInstance.user.findMany();
     for (const u of allUsers) {
-      if (rawText.toLowerCase().includes(u.fullName.toLowerCase().split(' ')[0])) {
+      const firstName = u.fullName.toLowerCase().split(' ')[0];
+      if (firstName.length >= 3 && rawText.toLowerCase().includes(firstName)) {
         assignedUsers.push(u);
       }
     }
   }
 
-  // Hala sorumlu yoksa görevi oluşturan kişiyi ata
+  // 3. Birebir sohbetteyse karşıdaki kişiyi otomatik sorumlu yap
+  if (assignedUsers.length === 0 && !isGroup) {
+    assignedUsers.push(createdByUser);
+  }
+
+  // 4. Hala sorumlu yoksa görevi oluşturan kişiyi ata
   if (assignedUsers.length === 0) {
     assignedUsers.push(createdByUser);
   }
 
-  // Tarih tespiti (Örn: 03.09.2026)
+  // Tarih tespiti (Örn: 03.09.2026 veya 03/09/2026)
   const dateMatch = rawText.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
   if (dateMatch) {
     const day = parseInt(dateMatch[1], 10);
     const month = parseInt(dateMatch[2], 10) - 1;
     const year = parseInt(dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3], 10);
     dueDate = new Date(year, month, day, 18, 0, 0);
+  }
+
+  // Öncelik tespiti
+  let priority: TaskPriority = TaskPriority.MEDIUM;
+  if (rawText.toLowerCase().includes('acil') || rawText.toLowerCase().includes('kritik')) {
+    priority = TaskPriority.URGENT;
+  } else if (rawText.toLowerCase().includes('onemli') || rawText.toLowerCase().includes('önemli') || rawText.toLowerCase().includes('yüksek')) {
+    priority = TaskPriority.HIGH;
+  } else if (rawText.toLowerCase().includes('düşük') || rawText.toLowerCase().includes('dusuk')) {
+    priority = TaskPriority.LOW;
   }
 
   const primaryAssignee = assignedUsers[0];
@@ -366,11 +441,11 @@ async function handleWhatsAppTaskCommand(
       groupId,
       messageId: sourceMessage.id,
       title: targetTitle.slice(0, 255),
-      description: 'WhatsApp Botu tarafından oluşturuldu.\nGönderen: ' + createdByUser.fullName,
+      description: 'WhatsApp üzerinden oluşturuldu.\nGönderen: ' + createdByUser.fullName,
       assignedToId: primaryAssignee.id,
       createdById: createdByUser.id,
       status: TaskStatus.PENDING,
-      priority: TaskPriority.HIGH,
+      priority,
       dueDate,
       assignees: {
         create: assignedUsers.map((u) => ({ userId: u.id })),
@@ -404,6 +479,104 @@ async function handleWhatsAppTaskCommand(
   } catch (err) {
     console.error('[WhatsApp] Bot yanıt hatası:', err);
   }
+}
+
+// 🤖 WhatsApp Botu !durum / !gorevler Komutu
+async function handleWhatsAppStatusCommand(msg: WAMessage, groupId: string) {
+  if (!prismaInstance) return;
+
+  try {
+    const activeTasks = await prismaInstance.task.findMany({
+      where: {
+        groupId,
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+      },
+      include: {
+        assignedTo: { select: { fullName: true } },
+        assignees: { include: { user: { select: { fullName: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+
+    if (activeTasks.length === 0) {
+      await msg.reply('📊 *Aktif Görev Bulunmuyor.*\nBu sohbete ait bekleyen tüm görevler tamamlanmış.');
+      return;
+    }
+
+    let report = '📊 *Aktif Görevler (' + activeTasks.length + ' Adet):*\n\n';
+    activeTasks.forEach((t, idx) => {
+      const assignees = t.assignees.map((a) => a.user.fullName).join(', ') || t.assignedTo?.fullName || 'Belirtilmedi';
+      const dateStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString('tr-TR') : '-';
+      const statusIcon = t.status === 'IN_PROGRESS' ? '⏳' : '📌';
+      report += (idx + 1) + '. ' + statusIcon + ' *' + t.title + '*\n   👤 ' + assignees + ' | 📅 ' + dateStr + '\n';
+    });
+
+    report += '\n_Tamamlamak için: !tamamla <görev adı>_';
+    await msg.reply(report);
+  } catch (e) {
+    console.error('[WhatsApp] Status error:', e);
+  }
+}
+
+// 🤖 WhatsApp Botu !tamamla Komutu
+async function handleWhatsAppCompleteCommand(msg: WAMessage, groupId: string, senderUser: any) {
+  if (!prismaInstance || !ioInstance) return;
+
+  const targetKeyword = msg.body.replace(/^!(tamamla|bitti|done)/i, '').trim().toLowerCase();
+
+  try {
+    const tasks = await prismaInstance.task.findMany({
+      where: {
+        groupId,
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let matchedTask = tasks.find((t) => t.title.toLowerCase().includes(targetKeyword));
+    if (!matchedTask && tasks.length === 1) {
+      matchedTask = tasks[0];
+    }
+
+    if (!matchedTask) {
+      await msg.reply('⚠️ Tamamlanacak görev bulunamadı. Lütfen görev adını belirtin (Örn: !tamamla Rapor)');
+      return;
+    }
+
+    const updated = await prismaInstance.task.update({
+      where: { id: matchedTask.id },
+      data: { status: TaskStatus.COMPLETED },
+      include: {
+        assignedTo: { select: { id: true, fullName: true, avatarUrl: true } },
+        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
+        assignees: { include: { user: { select: { id: true, fullName: true, avatarUrl: true, email: true } } } },
+      },
+    });
+
+    ioInstance.to('group_' + groupId).emit('task_updated', updated);
+    ioInstance.to('group_' + groupId).emit('message_task_updated', {
+      messageId: updated.messageId,
+      task: updated,
+    });
+
+    await msg.reply('🎉 *Görev Başarıyla Tamamlandı!*\n\n✅ "' + updated.title + '" kapatıldı.\n_İşlem Yapan: ' + senderUser.fullName + '_');
+  } catch (e) {
+    console.error('[WhatsApp] Complete error:', e);
+  }
+}
+
+// 🤖 WhatsApp Botu !yardim Komutu
+async function handleWhatsAppHelpCommand(msg: WAMessage) {
+  const helpText = '🤖 *PRJrms WhatsApp Asistanı*\n\n' +
+    '📌 *!gorev <Başlık> [Tarih]*\n_Örnek: !gorev Fatura kesilecek 05.09.2026_\n\n' +
+    '📊 *!durum* veya *!gorevler*\n_Bu sohbetteki aktif görevleri listeler_\n\n' +
+    '✅ *!tamamla <Görev Adı>*\n_Görevi tamamlandı olarak işaretler_\n\n' +
+    'ℹ️ *!yardim*\n_Bu menüyü gösterir_';
+
+  try {
+    await msg.reply(helpText);
+  } catch (e) {}
 }
 
 function broadcastStatus() {
@@ -442,97 +615,170 @@ export async function disconnectWhatsApp() {
   broadcastStatus();
 }
 
-// WhatsApp Gruplarını Listele
+// Tüm WhatsApp Sohbetlerini ve Kişilerini Getir (Gruplar + Birebir Yazışmalar)
 export async function getWhatsAppChats() {
-  if (!client) {
-    return Array.from(cachedChatsMap.values());
-  }
+  const resultChats: any[] = [];
+  const seenIds = new Set<string>();
 
-  // 1. Try standard getChats()
-  try {
-    const chats = await client.getChats();
-    if (chats && chats.length > 0) {
-      for (const c of chats) {
-        if (c && c.id) {
-          const cid = c.id._serialized || (typeof c.id === 'string' ? c.id : '');
-          if (cid) {
-            const isGrp = c.isGroup || cid.endsWith('@g.us');
-            cachedChatsMap.set(cid, {
-              id: cid,
-              name: c.name || (c as any).formattedTitle || (isGrp ? 'WhatsApp Grubu' : 'Kişi'),
-              isGroup: isGrp,
-              unreadCount: c.unreadCount || 0,
+  // 1. Veritabanındaki tüm personelleri birebir sohbet olarak listele
+  if (prismaInstance) {
+    try {
+      const users = await prismaInstance.user.findMany({
+        where: { isActive: true },
+        select: { id: true, fullName: true, phone: true, role: true },
+      });
+      for (const u of users) {
+        if (u.phone) {
+          const clean = normalizePhone(u.phone);
+          const fullNumber = clean.startsWith('90') ? clean : ('90' + clean.replace(/^0+/, ''));
+          const waId = fullNumber + '@c.us';
+          if (!seenIds.has(waId)) {
+            seenIds.add(waId);
+            resultChats.push({
+              id: waId,
+              name: u.fullName + ' (' + (u.role === 'ADMIN' ? 'Yönetici' : 'Personel') + ')',
+              isGroup: false,
+              number: fullNumber,
+              type: 'personnel',
             });
           }
         }
       }
-    }
-  } catch (err) {
-    console.warn('[WhatsApp] client.getChats() fallback denenecek:', err);
+    } catch (e) {}
   }
 
-  // 2. Puppeteer Store Evaluation Fallback
-  try {
-    // @ts-ignore
-    const page = client.pupPage;
-    if (page) {
-      const evalChats = await page.evaluate(() => {
-        const out: any[] = [];
-        const w = window as any;
-        try {
-          if (w.Store && w.Store.Chat) {
-            const models = w.Store.Chat.models || w.Store.Chat._models || [];
-            for (const m of models) {
-              const id = m.id?._serialized || (typeof m.id === 'string' ? m.id : null);
-              if (id) {
-                out.push({
-                  id,
-                  name: m.name || m.formattedTitle || m.contact?.name || m.title || id,
-                  isGroup: m.isGroup || id.endsWith('@g.us'),
-                  unreadCount: m.unreadCount || 0,
-                });
-              }
-            }
-          }
-          if (w.Store && w.Store.GroupMetadata) {
-            const gmodels = w.Store.GroupMetadata.models || w.Store.GroupMetadata._models || [];
-            for (const gm of gmodels) {
-              const gid = gm.id?._serialized || (typeof gm.id === 'string' ? gm.id : null);
-              if (gid) {
-                out.push({
-                  id: gid,
-                  name: gm.subject || gm.name || 'WhatsApp Grubu',
-                  isGroup: true,
-                });
-              }
-            }
-          }
-        } catch (e) {}
-        return out;
-      });
-
-      if (Array.isArray(evalChats)) {
-        for (const item of evalChats) {
-          if (item && item.id) {
-            cachedChatsMap.set(item.id, item);
+  // 2. WhatsApp Client'tan tüm Rehber ve Kişileri Al
+  if (client) {
+    try {
+      const contacts = await client.getContacts();
+      if (contacts && contacts.length > 0) {
+        for (const c of contacts) {
+          const cid = c.id?._serialized || (typeof c.id === 'string' ? c.id : '');
+          if (cid && !cid.includes('status@broadcast') && !seenIds.has(cid)) {
+            seenIds.add(cid);
+            const isGrp = c.isGroup || cid.endsWith('@g.us');
+            const displayName = c.name || c.pushname || (c as any).formattedTitle || c.number || cid.split('@')[0];
+            resultChats.push({
+              id: cid,
+              name: displayName,
+              isGroup: isGrp,
+              number: c.number || null,
+              type: isGrp ? 'group' : 'contact',
+            });
           }
         }
       }
+    } catch (e) {
+      console.warn('[WhatsApp] getContacts error:', e);
     }
-  } catch (evalErr) {
-    console.warn('[WhatsApp] page evaluate fallback uyarısı:', evalErr);
+
+    // 3. WhatsApp Client'tan aktif Sohbetleri Al
+    try {
+      const chats = await client.getChats();
+      if (chats && chats.length > 0) {
+        for (const c of chats) {
+          const cid = c.id?._serialized || (typeof c.id === 'string' ? c.id : '');
+          if (cid && !seenIds.has(cid)) {
+            seenIds.add(cid);
+            const isGrp = c.isGroup || cid.endsWith('@g.us');
+            resultChats.push({
+              id: cid,
+              name: c.name || (c as any).formattedTitle || (isGrp ? 'WhatsApp Grubu' : 'Kişi'),
+              isGroup: isGrp,
+              unreadCount: c.unreadCount || 0,
+              type: isGrp ? 'group' : 'chat',
+            });
+          }
+        }
+      }
+    } catch (e) {}
   }
 
-  // 3. Return cached items sorted with groups first
-  const list = Array.from(cachedChatsMap.values());
-  return list.sort((a, b) => {
+  // 4. Önbellekteki sohbetleri birleştir
+  for (const [id, item] of cachedChatsMap.entries()) {
+    if (!seenIds.has(id)) {
+      seenIds.add(id);
+      resultChats.push(item);
+    }
+  }
+
+  // 5. Halihazırda bağlı PRJrms Gruplarını İşaretle
+  if (prismaInstance) {
+    try {
+      const boundGroups = await prismaInstance.group.findMany({
+        where: { whatsappChatId: { not: null } },
+        select: { id: true, name: true, whatsappChatId: true },
+      });
+      const boundMap = new Map(boundGroups.map((g) => [g.whatsappChatId!, { id: g.id, name: g.name }]));
+      for (const item of resultChats) {
+        if (boundMap.has(item.id)) {
+          item.boundGroup = boundMap.get(item.id);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Grupları öne al, sonra kişileri alfabetik sırala
+  return resultChats.sort((a, b) => {
     if (a.isGroup && !b.isGroup) return -1;
     if (!a.isGroup && b.isGroup) return 1;
-    return a.name.localeCompare(b.name, 'tr');
+    return (a.name || '').localeCompare(b.name || '', 'tr');
   });
 }
 
-// Bir PRJrms Grubu ile WhatsApp Grubunu Eşleştir
+// Seçilen WhatsApp Sohbeti için Yeni PRJrms Kanalı Oluştur
+export async function createChannelForWhatsApp(waChatId: string, name: string, isGroup: boolean) {
+  if (!prismaInstance || !ioInstance) return null;
+
+  // Zaten varsa onu döndür
+  const existing = await prismaInstance.group.findFirst({
+    where: { whatsappChatId: waChatId },
+    include: {
+      members: { include: { user: { select: { id: true, fullName: true, avatarUrl: true, role: true, email: true } } } },
+      tasks: true,
+    },
+  });
+  if (existing) return existing;
+
+  const adminUser = await prismaInstance.user.findFirst({ where: { role: 'ADMIN' } });
+  const membersToCreate: any[] = [];
+  if (adminUser) {
+    membersToCreate.push({ userId: adminUser.id, role: 'ADMIN' });
+  }
+
+  // Eğer 1-on-1 kişi ise ve sistemde kayıtlıysa o kişiyi de ekle
+  if (!isGroup) {
+    const rawNumber = waChatId.split('@')[0];
+    const contactUser = await findOrCreateWhatsAppUser(rawNumber, name);
+    if (contactUser && adminUser && contactUser.id !== adminUser.id) {
+      membersToCreate.push({ userId: contactUser.id, role: 'MEMBER' });
+    }
+  }
+
+  const newGroup = await prismaInstance.group.create({
+    data: {
+      name: (name || (isGroup ? 'WhatsApp Grubu' : 'WhatsApp Kişisi')).slice(0, 100),
+      description: isGroup ? 'WhatsApp Grubu Senkronizasyonu' : ('WhatsApp Birebir Sohbet (' + name + ')'),
+      whatsappChatId: waChatId,
+      members: {
+        create: membersToCreate,
+      },
+    },
+    include: {
+      members: {
+        include: {
+          user: { select: { id: true, fullName: true, avatarUrl: true, role: true, email: true } },
+        },
+      },
+      tasks: true,
+    },
+  });
+
+  ioInstance.emit('group_created', newGroup);
+  return newGroup;
+}
+
+// Bir PRJrms Grubu ile WhatsApp Sohbetini Eşleştir
 export async function bindWhatsAppGroup(groupId: string, waChatId: string) {
   if (!prismaInstance) return;
   await prismaInstance.group.update({
@@ -558,7 +804,7 @@ export async function notifyWhatsAppTaskCreated(task: any) {
 
     const dateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('tr-TR') : 'Belirtilmedi';
 
-    const text = '📋 *Yeni Görev Tanımlandı*\n\n📌 *Başlık:* ' + task.title + '\n👤 *Sorumlular:* ' + assignees + '\n📅 *Bitiş Tarihi:* ' + dateStr + '\n⚡ *Öncelik:* ' + (task.priority || 'NORMAL') + '\n\n_PRJrms Sistemi_';
+    const text = '📋 *Yeni Görev Tanımlandı*\n\n📌 *Başlık:* ' + task.title + '\n👤 *Sorumlular:* ' + assignees + '\n📅 *Bitiş Tarihi:* ' + dateStr + '\n⚡ *Öncelik:* ' + (task.priority || 'MEDIUM') + '\n\n_PRJrms Sistemi_';
 
     await client.sendMessage(group.whatsappChatId, text);
   } catch (err) {
@@ -595,5 +841,15 @@ export async function notifyWhatsAppTaskReopened(task: any, reopenedByName?: str
     await client.sendMessage(group.whatsappChatId, text);
   } catch (err) {
     console.error('[WhatsApp] Görev yeniden açıldı bildirim hatası:', err);
+  }
+}
+
+// 💬 GİDEN MESAJ: PRJrms'de yazılan mesajı WhatsApp'a ilet
+export async function sendWhatsAppMessageToChat(waChatId: string, messageText: string) {
+  if (!client || state.status !== 'ready') return;
+  try {
+    await client.sendMessage(waChatId, messageText);
+  } catch (err) {
+    console.error('[WhatsApp] Giden mesaj hatası:', err);
   }
 }
